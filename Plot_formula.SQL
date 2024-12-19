@@ -5,7 +5,7 @@ set nocount on ;
 drop table if exists #formula
 
 select
-y = '10 * x + 5' 
+y = 'x*x' 
 into #formula
 
 -- drop table if exists #dots
@@ -28,24 +28,24 @@ into #formula
 
 -- select *  from #dots
 
-drop table if exists #y 
+drop table if exists #calc 
 
 select
 id = 1
 , x = cast(NULL as decimal(38, 2) )
 , y = cast(NULL as decimal(38, 2) ) 
-into #y 
+into #calc 
 
-truncate table #y
+truncate table #calc
 
--- select * from #y
+-- select * from #calc
 
 declare @i int = 1
 declare @exec_sql nvarchar(max)
 declare @x decimal(38, 2) = -10.0
 declare @y decimal(38, 2)
 
-while @x < 10.0 
+while @x <= 10.0 
 begin
  select 
     @exec_sql = 'select ' + CONCAT_WS(', '
@@ -55,20 +55,58 @@ begin
                                     )
 from #formula 
 
--- print @exec_sql
+print @exec_sql
 
-insert into #y 
+insert into #calc 
 exec sp_executesql @exec_sql
+
  
 set @i = @i + 1
-set @x = @x + 0.1
+set @x = @x + 1
 
 end 
 
 
 
 
-select * from #y
+-- select * from #calc
 
 
 ---plot - to generate 256*256 points, if (y, x) in the table, then 1 else 0
+
+drop table if exists #dots 
+
+drop table if exists #y_middle
+
+select y_middle = y into #y_middle
+from (
+	select rn = ROW_NUMBER() over(order by id), cnt = count(*) over (), * from #calc 
+) _ 
+where rn in (cnt / 2)  -- (cnt / 2 + 1 , (cnt + 1) / 2  )  -- this is to get the median line, not calculating the median value
+
+
+select 
+b.x
+, a.y
+ , dot = case 
+              when b.x = 0 then '^' -- nchar(65372)
+			  when a.y = (select y_middle from #y_middle) then '>' -- nchar(9135)
+			  when a.x = b.x  then '#'  -- this is the one calculated
+              else '.' -- filler 
+         end 
+into #dots 
+from #calc a, #calc b  -- for all the calculated y, get x, from -10 to 10
+order by a.y, b.x 
+
+
+select 
+y
+, line_item = STRING_AGG(dot, '') within group (order by x)
+from #dots 
+group by y
+order by y desc  
+
+
+
+--select * from #dots
+--where dot  != ' '
