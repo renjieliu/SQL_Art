@@ -1,11 +1,12 @@
--- plotting : ""
+-- plotting : "https://www.wolframalpha.com/input?i=plot+x%5E3+-+6x%5E2+%2B+4x+%2B+12"
+
 set nocount on ; 
 
 
 drop table if exists #formula
 
 select
-y = 'x*x' 
+y = 'x*x*x - 6*(x*x) + 4*x + 12' 
 into #formula
 
 -- drop table if exists #dots
@@ -55,14 +56,14 @@ begin
                                     )
 from #formula 
 
-print @exec_sql
+-- print @exec_sql
 
 insert into #calc 
 exec sp_executesql @exec_sql
 
  
 set @i = @i + 1
-set @x = @x + 1
+set @x = @x + 0.1
 
 end 
 
@@ -89,8 +90,8 @@ select
 b.x
 , a.y
  , dot = case 
-              when b.x = 0 then '^' -- nchar(65372)
-			  when a.y = (select y_middle from #y_middle) then '>' -- nchar(9135)
+              --when b.x = 0 then '^' -- nchar(65372)
+			  --when a.y = (select y_middle from #y_middle) then '>' -- nchar(9135)
 			  when a.x = b.x  then '#'  -- this is the one calculated
               else '.' -- filler 
          end 
