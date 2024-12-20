@@ -40,7 +40,7 @@ truncate table #calc
 
 declare @i int = 1
 declare @exec_sql nvarchar(max)
-declare @x decimal(38, 2) = -5.0
+declare @x decimal(38, 2) = -3.0
 declare @x_end decimal(38, 2) = -@x
 declare @x_step decimal(38, 2) = 0.01
 declare @y decimal(38, 2)
@@ -56,10 +56,17 @@ begin
 from #formula 
 
 -- print @exec_sql
-
+begin try
 insert into #calc 
 exec sp_executesql @exec_sql
+end try
 
+begin catch 
+-- no need to do anything, this is just to pass through the ones like 1/0
+-- put the value to the end table
+insert into #calc 
+select @i, @x, y = NULL
+end catch
  
 set @i = @i + 1
 set @x = @x + @x_step
@@ -141,4 +148,7 @@ order by y desc
 --order by x
 
 
-select * from #y_middle
+-- select * from #y_middle
+
+
+
