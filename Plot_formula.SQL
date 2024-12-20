@@ -1,15 +1,30 @@
--- plotting : "https://www.wolframalpha.com/input?i=plot+x%5E3+-+6x%5E2+%2B+4x+%2B+12"
-
 set nocount on ; 
-
  
 drop table if exists #formula
 
 select
-y = 'cos(x)' 
+y = 'sin(x)' 
 into #formula
 
+-- drop table if exists #dots
 
+-- ; with cte as 
+-- (select n = 1, x = cast(1.0 as decimal(38,2) )
+--     union all 
+-- select n+1 , cast(x + 0.1 as decimal(38,2) )  from cte
+-- where n < 500
+-- )
+-- select 
+-- *
+-- , y_formula = cast(NULL as varchar(max))
+-- into #dots 
+-- from cte 
+-- OPTION(maxrecursion 0)
+
+-- update #dots 
+-- set y_formula = (select  replace(y, 'x', cast(x as varchar)) from #formula )
+
+-- select *  from #dots
 
 drop table if exists #calc 
 
