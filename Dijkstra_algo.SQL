@@ -19,15 +19,16 @@ score = PARSENAME(cra.grp,2)
 , node = PARSENAME(cra.grp, 1)
  from base
     cross apply (select grp = [value] from string_split([input], '|')) cra
+where isnull(grp, '')!= ''
 order by score, node 
 ) 
-select top_stk =  score + '.' + node from to_pop 
+select heap_top =  score + '.' + node from to_pop 
 
 go 
 
 
 
-create or alter function heappush (@heapString varchar(max), @newNodeCost varchar(max))
+create or alter function heappush(@heapString varchar(max), @newNodeCost varchar(max))
 --- heappush -- 500.D 
 -- parameter: heapString, new nodeX.Cost
 -- return: heapString after concatenation
@@ -36,7 +37,7 @@ with base as
 (
     select input =@heapString 
 )
-select res = CONCAT_WS('|', input, @newNodeCost) from base
+select heap = CONCAT_WS('|', input, @newNodeCost) from base
 
 go
 
@@ -72,10 +73,6 @@ select hashmap = '|' + STRING_AGG( concat_ws('.', node, @val), '|')
 from base 
     cross apply (select node = [value] from string_split(nodes, ',' ) ) cra
  
-
-go 
-
-
 
 go 
 
@@ -154,10 +151,11 @@ SELECT 'F' AS Node1, 'H' AS Node2, 2 AS Cost
 UNION
 SELECT 'E' AS Node1, 'F' AS Node2, 20 AS Cost
 
-
+; with cte as 
+(
 select 
 id = 1 
-, currNode = 'A'
+, Node = 'A'
 , hashmap  = (select start_node.hashmap
                 from
                 (
@@ -173,14 +171,55 @@ id = 1
                 cross apply (select hashmap from updateCost(hashmap, 'A', 0)) start_node
             )
 
+, heap =  (select heap from heappush('','A.0' ) _ )
+
+union all 
+
+select 
+id + 1
+, _heap_top.heap_node -- this need to be the popped node
+, hashmap = _update_hashmap.hashmap
+, heap = _push_new_value_to_heap.heap
+from cte 
+cross apply (select 
+            heap_node = parsename(heap_top, 2)
+            , heap_score = cast(parsename (heap_top, 2) as bigint)
+             from heappop('|A.0') 
+            ) _heap_top  -- pop the heap
+cross apply (select 
+                nodes.node2 
+                , nodes.cost
+             from _heap_top inner join #input nodes 
+             on _heap_top.heap_node = nodes.node 
+             ) _nxt_nodes -- find all the nodes connect to the popped node
+cross apply (
+    select cost from getNodeVal(hashmap, _nxt_nodes.nodes2 )
+) _costs -- get the cost of the node
+cross apply (
+    select to_update = case when _cost.cost < heap_score + cost then 1 else 0 end 
+) _can_save -- check if the cost is smaller if from current node to it
+cross apply (
+    select hashmap from updateCost(hashmap, node2, heap_score + cost )
+    where to_update = 1 
+) _update_hashmap-- if so, update the hashmap
+cross apply (
+    select heap from heappush(heapmap, concat_ws('.', node2, heap_score + cost)) _
+) _push_new_value_to_heap
+
+where heap != '' -- until the heap is all popped
+
+) 
+
+select * from cte 
+option (maxrecursion 0)
 
 
+-- getNodeVal(@hashmap varchar(max), @node varchar(max))
 
-
-
+-- heappush(@heapString varchar(max), @newNodeCost varchar(max))
 -- updateCost
 -- getNodeVal
 -- initialize_hashmap
--- heappush
 -- heappop
 
+ -- nodeX.Cost
