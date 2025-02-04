@@ -24,7 +24,7 @@ go
 
 
 create or alter function heappop(@heap varchar(max))
--- 120.A|100.B|300.C --> 100.B
+-- A.100|B.10|C.12 --> B.10
 -- parameter: heapString
 -- return string: lowest nodeX.cost
 returns table as return 
@@ -33,19 +33,29 @@ with base as
     select input = @heap
 )
 , to_pop as (
-    select top 1 
-    score = PARSENAME(cra.grp,2)
-    , node = PARSENAME(cra.grp, 1)
+    select  
+    rn = ROW_NUMBER() over (order by cast(PARSENAME(cra.grp,1) as int))
+    , score = PARSENAME(cra.grp,1)
+    , node = PARSENAME(cra.grp, 2)
     from base
     cross apply (select grp = [value] from string_split([input], '|')) cra
     where isnull(grp, '')!= ''
-    order by score, node 
 ) 
-select heap_top =  score + '.' + node from to_pop 
-
+select 
+heap_top = (select heap_top = node + '.' + score 
+                from to_pop 
+                where rn = 1
+            )
+, heap_rem = isnull((select string_agg(node + '.' + score, '|') within group(order by score) 
+                from to_pop where rn != 1 
+                    )
+                , '')
 go 
 
+-- select * from heappop('|A.100')
 
+
+go
 
 create or alter function heappush(@heap varchar(max), @nodes_costs varchar(max))
 --- heappush -- 500.D  --> @heap + @newNodeCost
@@ -87,6 +97,8 @@ select
 heap = '|' + string_agg(CONCAT_WS('.', node, val), '|') within group (order by node)
 from updated
 go
+
+-- select * from heappop('|B.2|C.6')
 
 -- node.cost
 
@@ -178,17 +190,16 @@ returns table as return
 -- hashmap:  |A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999
 -- heap: |A.0 
 select hashmap, heap from updateCost(
-                        '|A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999'
-                        , '|A.200|B.300') _update_hashmap -- update the hashmap 
+                        @hashmap
+                        , @nodes_costs) _update_hashmap -- update the hashmap 
                     cross apply 
-                    heappush (
-                    '|A.0'
-                    , '|A.100|B.200|C.300'
+                        heappush(
+                        @heap
+                        ,@nodes_costs
                     ) _heap_push
 
 
 go
-
 
 
 
@@ -245,6 +256,8 @@ step = 0
                  )
              as varchar(max)) 
 , heap = cast( (select heap from heappush('','|A.0') _ ) as varchar(max))
+, heap_node = cast('-' as varchar(max))
+, heap_rem = cast('-' as varchar(max))
 , nodes_costs = cast('' as varchar(max))
 union all 
 
@@ -253,23 +266,26 @@ step + 1
 , cast(_heap_top.heap_node  as varchar(max))-- this need to be the popped node
 , cast( _dijk.hashmap as varchar(max)) -- =   cast( _update_hashmap.hashmap as varchar(max))
 , cast( _dijk.heap as varchar(max))-- = cast( _push_new_value_to_heap.heap as varchar(max)) 
+, cast(_heap_top.heap_node as varchar(max))
+, cast(_heap_top.heap_rem as varchar(max))
 , nodes_costs = cast(_nodes_costs.nodes_costs as varchar(max))
 from cte c
 cross apply (select -- pop the heap 
             heap_node = parsename(heap_top, 2)
             , heap_cost = cast(parsename (heap_top, 1) as bigint)
-             from heappop('|A.0') 
+            , heap_rem 
+            from heappop(c.heap) 
             ) _heap_top  -- cross apply alias cannot be referenced in another cross apply 
 
 cross apply (
-            select  nodes_costs_xml = (
+            select nodes_costs_xml = (
                                     select 
                                     -- connected_node = nodes.node2 
                                     -- , connected_node_cost = heap_cost + nodes.cost
                                     --, 
-                                    combined = concat(nodes.node2,  '.',  heap_cost + nodes.cost, '|')
+                                    combined = concat(nodes.node2,  '.', cast( (heap_cost + nodes.cost) as varchar(max)), '|')
                                     from #input nodes 
-                                    where nodes.Node1 = heap_node 
+                                    where nodes.Node1 = _heap_top.heap_node 
                                     for xml path('')
                                 )  
             ) _nodes_costs_xml
@@ -277,11 +293,11 @@ cross apply (
 
 cross apply 
 (select nodes_costs_cleaned = replace( 
-                            replace(nodes_costs_xml
-                                    , '<combined>'
-                                    , ''
-                                   ) 
-                            , '</combined>' 
+                                replace(nodes_costs_xml
+                                        , '<combined>'
+                                        , ''
+                                    ) 
+                                , '</combined>' 
                             , '')
 ) _nodes_costs_xml_cleaned
 cross apply 
@@ -295,9 +311,30 @@ cross apply (
             from dijk(
                     _nodes_costs.nodes_costs
                     , c.hashmap
-                    , c.heap
+                    , _heap_top.heap_rem --c.heap
                     ) _
             ) _dijk
+
+
+where c.heap != '' -- until the heap is all popped
+-- and step < 5 
+) 
+
+select * from cte 
+option (maxrecursion 0)
+
+
+
+select 
+hashmap
+, heap
+from dijk(
+    'B.2|C.6'
+    , '|A.0|B.2|C.6|D.99999|E.99999|F.99999|G.99999|H.99999'
+    , '' --c.heap
+    ) _
+ 
+
 -- cross apply (
 --     select prev_cost = cast(cost as bigint) from getNodeVal(hashmap, _nxt_nodes.connected_node ) -- get the cost of the connected node
 -- ) _costs -- get the cost of the node
@@ -318,12 +355,6 @@ cross apply (
 --     where new_cost < prev_cost
 -- ) _push_new_value_to_heap
 
-where c.heap != '' -- until the heap is all popped
-
-) 
-
-select * from cte 
-option (maxrecursion 0)
 
 
 -- getNodeVal(@hashmap varchar(max), @node varchar(max))
