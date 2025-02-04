@@ -217,32 +217,17 @@ go
 
 
 
--------------------------------------------------------
+--------------------------------------------------------------------------------------------------------------
+--=========================================================================================
 
 drop table if exists #input
 
-SELECT 'A' AS Node1, 'B' AS Node2, 2 AS Cost
-into #input
-UNION
-SELECT 'A' AS Node1, 'C' AS Node2, 6 AS Cost
-UNION
-SELECT 'B' AS Node1, 'D' AS Node2, 5 AS Cost
-UNION
-SELECT 'C' AS Node1, 'D' AS Node2, 8 AS Cost
-UNION
-SELECT 'C' AS Node1, 'E' AS Node2, 2 AS Cost
-UNION
-SELECT 'D' AS Node1, 'F' AS Node2, 10 AS Cost
-UNION
-SELECT 'D' AS Node1, 'G' AS Node2, 15 AS Cost
-UNION
-SELECT 'G' AS Node1, 'F' AS Node2, 6 AS Cost
-UNION
-SELECT 'G' AS Node1, 'H' AS Node2, 6 AS Cost
-UNION
-SELECT 'F' AS Node1, 'H' AS Node2, 2 AS Cost
-UNION
-SELECT 'E' AS Node1, 'F' AS Node2, 20 AS Cost
+
+-- original example
+-- SELECT 'A' AS Node1, 'B' AS Node2, 2 AS Cost into #input UNION SELECT 'A' AS Node1, 'C' AS Node2, 6 AS Cost UNION SELECT 'B' AS Node1, 'D' AS Node2, 5 AS Cost UNION SELECT 'C' AS Node1, 'D' AS Node2, 8 AS Cost UNION SELECT 'C' AS Node1, 'E' AS Node2, 2 AS Cost UNION SELECT 'D' AS Node1, 'F' AS Node2, 10 AS Cost UNION SELECT 'D' AS Node1, 'G' AS Node2, 15 AS Cost UNION SELECT 'G' AS Node1, 'F' AS Node2, 6 AS Cost UNION SELECT 'G' AS Node1, 'H' AS Node2, 6 AS Cost UNION SELECT 'F' AS Node1, 'H' AS Node2, 2 AS Cost UNION SELECT 'E' AS Node1, 'F' AS Node2, 20 AS Cost
+
+
+SELECT 'A' AS Node1, 'B' AS Node2, 2 AS Cost into #input UNION ALL SELECT 'A', 'C', 6 UNION ALL SELECT 'B', 'D', 5 UNION ALL SELECT 'B', 'E', 3 UNION ALL SELECT 'C', 'D', 8 UNION ALL SELECT 'C', 'F', 4 UNION ALL SELECT 'D', 'G', 7 UNION ALL SELECT 'D', 'H', 6 UNION ALL SELECT 'E', 'I', 5 UNION ALL SELECT 'E', 'J', 9 UNION ALL SELECT 'F', 'J', 2 UNION ALL SELECT 'F', 'K', 8 UNION ALL SELECT 'G', 'L', 3 UNION ALL SELECT 'G', 'M', 4 UNION ALL SELECT 'H', 'M', 7 UNION ALL SELECT 'H', 'N', 5 UNION ALL SELECT 'I', 'O', 6 UNION ALL SELECT 'J', 'O', 3 UNION ALL SELECT 'J', 'P', 7 UNION ALL SELECT 'K', 'P', 2 UNION ALL SELECT 'K', 'Q', 5 UNION ALL SELECT 'L', 'Q', 4 UNION ALL SELECT 'L', 'R', 6 UNION ALL SELECT 'M', 'R', 5 UNION ALL SELECT 'N', 'S', 6 UNION ALL SELECT 'N', 'T', 8 UNION ALL SELECT 'O', 'U', 4 UNION ALL SELECT 'P', 'V', 6 UNION ALL SELECT 'Q', 'W', 7 UNION ALL SELECT 'R', 'X', 5 UNION ALL SELECT 'S', 'T', 3 UNION ALL SELECT 'S', 'Y', 7 UNION ALL SELECT 'T', 'Z', 6 UNION ALL SELECT 'U', 'V', 2 UNION ALL SELECT 'V', 'W', 4 UNION ALL SELECT 'W', 'X', 6 UNION ALL SELECT 'X', 'Y', 4 UNION ALL SELECT 'Y', 'Z', 3;
 
 go
 
@@ -339,9 +324,9 @@ option (maxrecursion 0)
 
 
 
-select paths = 'A --> H', cost 
+select paths ='A --> Z', cost 
 from #dijk 
-cross apply (select * from getNodeVal(hashmap, 'H')) _ 
+cross apply (select * from getNodeVal(hashmap, 'Z')) _ 
 where ISNULL(heap, '') = ''
  
 
