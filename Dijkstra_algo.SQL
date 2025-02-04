@@ -145,8 +145,8 @@ create or alter function updateCost (@hashmap varchar(max), @nodes_costs varchar
 returns table as return
 with cte_hashmap as (
     select 
-    node = PARSENAME([value], 2)
-    , val = PARSENAME([value], 1)
+    node = PARSENAME([value], 2)  
+    , val = cast(PARSENAME([value], 1) as bigint)
     from string_split(@hashmap, '|') _
     where [value] != ''
 )
@@ -154,7 +154,7 @@ with cte_hashmap as (
 (
     select 
     node = PARSENAME([value], 2)
-    , val = PARSENAME([value], 1)
+    , val = cast(PARSENAME([value], 1) as bigint)
     from string_split(@nodes_costs, '|') _
     where [value] != ''
 )
@@ -162,7 +162,9 @@ with cte_hashmap as (
 (
     select 
     node = prev.node
-    , val = case when curr.node is not null and curr.val < prev.val then curr.val else prev.val end
+    , val = case when curr.node is not null and curr.val < prev.val then curr.val
+                 else prev.val
+            end
     from cte_hashmap prev left outer join cte_updates curr
     on prev.node = curr.node
 )
@@ -172,7 +174,7 @@ from updated
 go 
 
 
--- select * from updateCost('|A.0|B.99999|C.199', '|A.200|B.300') _ 
+select * from updateCost('|A.0|B.2|C.6|D.7|E.99999|F.99999|G.99999|H.99999', 'D.14') _ 
 
 
 create or alter function dijk(@nodes_costs varchar(max) -- node.cost|node.cost
@@ -325,14 +327,14 @@ option (maxrecursion 0)
 
 
 
-select 
-hashmap
-, heap
-from dijk(
-    'B.2|C.6'
-    , '|A.0|B.2|C.6|D.99999|E.99999|F.99999|G.99999|H.99999'
-    , '' --c.heap
-    ) _
+-- select 
+-- hashmap
+-- , heap
+-- from dijk(
+--     'B.2|C.6'
+--     , '|A.0|B.2|C.6|D.99999|E.99999|F.99999|G.99999|H.99999'
+--     , '' --c.heap
+--     ) _
  
 
 -- cross apply (
