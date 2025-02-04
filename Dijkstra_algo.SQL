@@ -245,7 +245,7 @@ step = 0
                  )
              as varchar(max)) 
 , heap = cast( (select heap from heappush('','|A.0') _ ) as varchar(max))
-
+, nodes_costs = cast('' as varchar(max))
 union all 
 
 select 
@@ -253,6 +253,7 @@ step + 1
 , cast(_heap_top.heap_node  as varchar(max))-- this need to be the popped node
 , cast( _dijk.hashmap as varchar(max)) -- =   cast( _update_hashmap.hashmap as varchar(max))
 , cast( _dijk.heap as varchar(max))-- = cast( _push_new_value_to_heap.heap as varchar(max)) 
+, nodes_costs = cast(_nodes_costs.nodes_costs as varchar(max))
 from cte c
 cross apply (select -- pop the heap 
             heap_node = parsename(heap_top, 2)
@@ -275,18 +276,24 @@ cross apply (
   -- find all the nodes connect to the heap top
 
 cross apply 
-(select nodes_costs = replace( 
-                            replace(nodes_costs_xml, '<combined>', '') 
+(select nodes_costs_cleaned = replace( 
+                            replace(nodes_costs_xml
+                                    , '<combined>'
+                                    , ''
+                                   ) 
                             , '</combined>' 
                             , '')
+) _nodes_costs_xml_cleaned
+cross apply 
+(
+select nodes_costs = left(nodes_costs_cleaned, len(nodes_costs_cleaned)- 1) 
 ) _nodes_costs
-
 cross apply (
             select 
             hashmap
             , heap
             from dijk(
-                    nodes_costs
+                    _nodes_costs.nodes_costs
                     , c.hashmap
                     , c.heap
                     ) _
