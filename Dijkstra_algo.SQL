@@ -3,7 +3,7 @@
 -- dijk (hash, heap, node, connected_nodes) --> return table, which has hash, heap as columns
 
 
-
+--- Function input format - |nodeX.cost|nodeY.cost|.....
 
 create or alter function initialize_hashmap(@nodeString varchar(max), @val bigint)
 -- param: nodes (A,B,C,D,E), val
@@ -339,7 +339,7 @@ option (maxrecursion 0)
 
 
 
-select cost 
+select paths = 'A --> H', cost 
 from #dijk 
 cross apply (select * from getNodeVal(hashmap, 'H')) _ 
 where ISNULL(heap, '') = ''
