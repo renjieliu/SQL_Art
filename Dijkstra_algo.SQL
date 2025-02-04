@@ -65,7 +65,7 @@ returns table as return
 with cte_heap as (
     select 
     node = PARSENAME([value], 2)
-    , val = PARSENAME([value], 1)
+    , val = cast(PARSENAME([value], 1) as bigint)
     from string_split(@heap, '|') _
     where [value] != ''
 )
@@ -73,7 +73,7 @@ with cte_heap as (
 (
     select 
     node = PARSENAME([value], 2)
-    , val = PARSENAME([value], 1)
+    , val = cast(PARSENAME([value], 1) as bigint)
     from string_split(@nodes_costs, '|') _
     where [value] != ''
 )
@@ -82,8 +82,10 @@ with cte_heap as (
     select 
     node 
     , val
-    from cte_heap 
+    from cte_heap h
     where node not in (select node from cte_updates) -- the nodes irrelevant to current updates
+    or 
+    exists (select * from cte_updates u where h.node = u.node and h.val < u.val) -- heap < current 
     union 
     select 
     node
@@ -91,14 +93,14 @@ with cte_heap as (
     from cte_updates u
     where node not in (select node from cte_heap) -- new nodes
         or 
-        exists (select * from cte_heap h where h.node = u.node and u.val < h.val) -- val < heap val
+    exists (select * from cte_heap h where h.node = u.node and u.val < h.val) -- current is < heap
 )
 select 
 heap = '|' + string_agg(CONCAT_WS('.', node, val), '|') within group (order by node)
 from updated
 go
 
--- select * from heappop('|B.2|C.6')
+-- select * from heappush('D.7', 'D.14|E.8')
 
 -- node.cost
 
@@ -121,21 +123,29 @@ go
 
 
 create or alter function getNodeVal(@hashmap varchar(max), @node varchar(max))
--- |A.0|B.99999|C.99999|, B  --> 99999
+-- |A.0|B.99999|C.99999, B  --> 99999
 -- parameter: nodeX (|node.) , hashmap
 -- return: cost
 returns table as return 
 with cte as 
-(select rem = right(@hashmap, len(@hashmap) - CHARINDEX(@node, @hashmap)))
-select cost = SUBSTRING(@hashmap
-                , CHARINDEX(@node+'.', @hashmap) + datalength(@node) + 1  -- from this location
-                , CHARINDEX('|', rem) - datalength(@node) - 1
-                )   
+(select rem = right(@hashmap, len(@hashmap) - CHARINDEX('|' + @node + '.', @hashmap)))
+select cost = cast (
+              case when CHARINDEX('|', rem) = 0 then PARSENAME(rem, 1)  -- the last part, it does not have the | in the end
+                   else SUBSTRING(@hashmap
+                                    , CHARINDEX('|' + @node+'.', @hashmap) + datalength(@node) + 2  -- from this location
+                                    , CHARINDEX('|', rem) - datalength(@node) - 2
+                                    )   
+              end 
+            as bigint)
 from cte
+
 
 
 go
 
+-- select * from getNodeVal('|A.0|B.2|C.6|D.7|E.8|F.17|G.22|H.19', 'H')
+--select * from getNodeVal('|A.0|B.99999|C.99999', 'H')
+go 
 
 
 create or alter function updateCost (@hashmap varchar(max), @nodes_costs varchar(max))
@@ -174,7 +184,7 @@ from updated
 go 
 
 
-select * from updateCost('|A.0|B.2|C.6|D.7|E.99999|F.99999|G.99999|H.99999', 'D.14') _ 
+-- select * from updateCost('|A.0|B.2|C.6|D.7|E.99999|F.99999|G.99999|H.99999', 'D.14') _ 
 
 
 create or alter function dijk(@nodes_costs varchar(max) -- node.cost|node.cost
@@ -237,6 +247,8 @@ SELECT 'E' AS Node1, 'F' AS Node2, 20 AS Cost
 go
 
 
+drop table if exists #dijk
+-- from A to H
 ; with cte as 
 (
 select 
@@ -322,10 +334,16 @@ where c.heap != '' -- until the heap is all popped
 -- and step < 5 
 ) 
 
-select * from cte 
+select * into #dijk from cte 
 option (maxrecursion 0)
 
 
+
+select cost 
+from #dijk 
+cross apply (select * from getNodeVal(hashmap, 'H')) _ 
+where ISNULL(heap, '') = ''
+ 
 
 -- select 
 -- hashmap
