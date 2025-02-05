@@ -1,11 +1,60 @@
+-- Dijkstra's algorithm steps
+-- Set all the nodes cost with a large number, hashmap
+-- Initialize the starting node's cost as 0, heap
+-- While the heap is not empty, pop the heap top 
+-- Get all the nodes connected to the heap top
+-- Check if the heaptop cost + cost_to_the_node is smaller than previously computed, which was stored in the hashmap
+-- If lower, update it in the hashmap, and push to the heap
+-- When the heap is empty, get the smallest cost of the ending node.
+
+-- To implemented the process in SQL, 
+-- Below functions are created to make it more streamlined
+
+
+-- f_initialize_hashmap(@nodeString varchar(max), @val bigint)
+    -- param: nodes (A,B,C,D,E), val
+    -- return hashmap |A.val|B.val... 
+
+-- f_heappop(@heap varchar(max))
+    -- A.100|B.10|C.12 --> B.10
+    -- parameter: heapString
+    -- return string: heap_top, heap_rem
+
+-- f_heappush(@heap varchar(max), @newNodeCost varchar(max))
+    -- parameter: heapString, |nodeX.Cost|nodeY.Cost
+    -- return: heapString after concatenation
+
+-- f_updateCost(@hashmap varchar(max), @nodes_costs varchar(max))
+    -- (|A.0|B.99999|C.199, '|A.200|B.300') --> |A.200|B.300|C.199
+    -- parameater: hashmap,  nodes_costs
+    -- return hashmap string after update
+
+-- f_dijk(@nodes_costs varchar(max), @hashmap varchar(max) , @heap varchar(max)
+    -- this function is a wrapper for the steps of dijkstra's algo
+    -- step 1 -- update the hashmap with the new cost 
+    -- step 2 -- push the lower cost into the heap 
+    -- step 3 -- return hashmap, and heap as the result 
+    -- node_costs |A.100|B.200|C.300
+    -- hashmap:  |A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999
+    -- heap: |A.0 
+    
+-- f_getNodeVal(@hashmap varchar(max), @node varchar(max))
+    -- |A.0|B.99999|C.99999, B  --> 99999
+    -- parameter: nodeX (|node.) , hashmap
+    -- return: cost
+
+
+
 -- For each heap popped head, it should only returns on line, and from that one line, the recursive CTE goes on 
 -- Need to have a wrapper function - dijk to compute the compare and return logic
 -- dijk (hash, heap, node, connected_nodes) --> return table, which has hash, heap as columns
 
 
+----====================================================================================================================
+
 --- Function input format - |nodeX.cost|nodeY.cost|.....
 
-create or alter function initialize_hashmap(@nodeString varchar(max), @val bigint)
+create or alter function f_initialize_hashmap(@nodeString varchar(max), @val bigint)
 -- param: nodes (A,B,C,D,E), val
 -- return hashmap |A.val|B.val... 
 
@@ -23,10 +72,10 @@ go
 
 
 
-create or alter function heappop(@heap varchar(max))
+create or alter function f_heappop(@heap varchar(max))
 -- A.100|B.10|C.12 --> B.10
 -- parameter: heapString
--- return string: lowest nodeX.cost
+-- return string: heap_top, heap_rem
 returns table as return 
 with base as 
 (
@@ -52,13 +101,13 @@ heap_top = (select heap_top = node + '.' + score
                 , '')
 go 
 
--- select * from heappop('|A.100')
+-- select * from f_heappop('|A.100')
 
 
 go
 
-create or alter function heappush(@heap varchar(max), @nodes_costs varchar(max))
---- heappush -- 500.D  --> @heap + @newNodeCost
+create or alter function f_heappush(@heap varchar(max), @nodes_costs varchar(max))
+--- f_heappush -- 500.D  --> @heap + @newNodeCost
 -- parameter: heapString, new nodeX.Cost
 -- return: heapString after concatenation
 returns table as return 
@@ -100,7 +149,7 @@ heap = '|' + string_agg(CONCAT_WS('.', node, val), '|') within group (order by n
 from updated
 go
 
--- select * from heappush('D.7', 'D.14|E.8')
+-- select * from f_heappush('D.7', 'D.14|E.8')
 
 -- node.cost
 
@@ -122,7 +171,7 @@ go
 go 
 
 
-create or alter function getNodeVal(@hashmap varchar(max), @node varchar(max))
+create or alter function f_getNodeVal(@hashmap varchar(max), @node varchar(max))
 -- |A.0|B.99999|C.99999, B  --> 99999
 -- parameter: nodeX (|node.) , hashmap
 -- return: cost
@@ -143,13 +192,13 @@ from cte
 
 go
 
--- select * from getNodeVal('|A.0|B.2|C.6|D.7|E.8|F.17|G.22|H.19', 'H')
---select * from getNodeVal('|A.0|B.99999|C.99999', 'H')
+-- select * from f_getNodeVal('|A.0|B.2|C.6|D.7|E.8|F.17|G.22|H.19', 'H')
+--select * from f_getNodeVal('|A.0|B.99999|C.99999', 'H')
 go 
 
 
-create or alter function updateCost (@hashmap varchar(max), @nodes_costs varchar(max))
--- updateCost(|A.0|B.99999|C.199, '|A.200|B.300') --> |A.200|B.300|C.199
+create or alter function f_updateCost (@hashmap varchar(max), @nodes_costs varchar(max))
+-- f_updateCost(|A.0|B.99999|C.199, '|A.200|B.300') --> |A.200|B.300|C.199
 -- parameater: hashmap,  nodes_costs
 -- return hashmap string after update
 returns table as return
@@ -184,15 +233,15 @@ from updated
 go 
 
 
--- select * from updateCost('|A.0|B.2|C.6|D.7|E.99999|F.99999|G.99999|H.99999', 'D.14') _ 
+-- select * from f_updateCost('|A.0|B.2|C.6|D.7|E.99999|F.99999|G.99999|H.99999', 'D.14') _ 
 
 
-create or alter function dijk(@nodes_costs varchar(max) -- node.cost|node.cost
+create or alter function f_dijk(@nodes_costs varchar(max) -- node.cost|node.cost
                              , @hashmap varchar(max)
                              , @heap varchar(max)
                               )
 returns table as return
---- this function is a wrappe for the steps of dijkstra's algo
+--- this function is a wrapper for the steps of dijkstra's algo
 
 -- step 1 -- update the hashmap with the new cost 
 -- step 2 -- push the lower cost into the heap 
@@ -201,11 +250,11 @@ returns table as return
 -- node_costs |A.100|B.200|C.300
 -- hashmap:  |A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999
 -- heap: |A.0 
-select hashmap, heap from updateCost(
+select hashmap, heap from f_updateCost(
                         @hashmap
                         , @nodes_costs) _update_hashmap -- update the hashmap 
                     cross apply 
-                        heappush(
+                        f_heappush(
                         @heap
                         ,@nodes_costs
                     ) _heap_push
@@ -217,8 +266,10 @@ go
 
 
 
---------------------------------------------------------------------------------------------------------------
 --=========================================================================================
+--=========================================================================================
+--=========================================================================================
+
 
 drop table if exists #input
 
@@ -250,11 +301,11 @@ step = 0
                         from #input
                     )  _ 
                 ) n 
-                cross apply (select hashmap from initialize_hashmap(nodes, 99999)) _ini
-                cross apply (select hashmap from updateCost(hashmap, '|A.0')) _start_node
+                cross apply (select hashmap from f_initialize_hashmap(nodes, 99999)) _ini
+                cross apply (select hashmap from f_updateCost(hashmap, '|A.0')) _start_node
                  )
              as varchar(max)) 
-, heap = cast( (select heap from heappush('','|A.0') _ ) as varchar(max))
+, heap = cast( (select heap from f_heappush('','|A.0') _ ) as varchar(max))
 , heap_node = cast('-' as varchar(max))
 , heap_rem = cast('-' as varchar(max))
 , nodes_costs = cast('' as varchar(max))
@@ -273,7 +324,7 @@ cross apply (select -- pop the heap
             heap_node = parsename(heap_top, 2)
             , heap_cost = cast(parsename (heap_top, 1) as bigint)
             , heap_rem 
-            from heappop(c.heap) 
+            from f_heappop(c.heap) 
             ) _heap_top  -- cross apply alias cannot be referenced in another cross apply 
 
 cross apply (
@@ -307,7 +358,7 @@ cross apply (
             select 
             hashmap
             , heap
-            from dijk(
+            from f_dijk(
                     _nodes_costs.nodes_costs
                     , c.hashmap
                     , _heap_top.heap_rem --c.heap
@@ -326,152 +377,8 @@ option (maxrecursion 0)
 
 select paths ='A --> Z', cost 
 from #dijk 
-cross apply (select * from getNodeVal(hashmap, 'Z')) _ 
+cross apply (select * from f_getNodeVal(hashmap, 'Z')) _ 
 where ISNULL(heap, '') = ''
  
 
--- select 
--- hashmap
--- , heap
--- from dijk(
---     'B.2|C.6'
---     , '|A.0|B.2|C.6|D.99999|E.99999|F.99999|G.99999|H.99999'
---     , '' --c.heap
---     ) _
- 
 
--- cross apply (
---     select prev_cost = cast(cost as bigint) from getNodeVal(hashmap, _nxt_nodes.connected_node ) -- get the cost of the connected node
--- ) _costs -- get the cost of the node
-
--- cross apply (
---     select new_cost = case when prev_cost <= heap_cost + connected_node_cost then prev_cost 
---                            else heap_cost + connected_node_cost 
---                        end 
--- ) _new_cost -- to get the new cost for the connected nodes
-
--- cross apply (
---     select hashmap from updateCost(hashmap, connected_node,  new_cost)
---     where new_cost < prev_cost
--- ) _update_hashmap -- update the hashmap 
-
--- cross apply (
---     select heap from heappush( heap, concat_ws('.', connected_node, new_cost) ) _heap_push
---     where new_cost < prev_cost
--- ) _push_new_value_to_heap
-
-
-
--- getNodeVal(@hashmap varchar(max), @node varchar(max))
-
--- heappush(@heap varchar(max), @newNodeCost varchar(max))
--- updateCost
--- getNodeVal
--- initialize_hashmap
--- heappop
-
- -- nodeX.Cost
-
-
-
-
-
-
-
-
-
-
-
--- select * from getNodeVal('|A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999', 'B' )
-
-
--- declare @hashmap varchar (max) = '|A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999'
--- declare @node varchar(max)  = 'B'
-
-
--- ; with cte as 
--- (select rem = right('|A.0|B.99999|C.99999|D.99999|E.99999|F.99999|G.99999|H.99999', len(@hashmap) - CHARINDEX(@node, @hashmap)))
--- select cost = SUBSTRING(@hashmap
---                 , CHARINDEX(@node+'.', @hashmap) + datalength(@node) + 1  -- from this location
---                 , CHARINDEX('|', rem) - datalength(@node) - 1
---                 )   
--- from cte
-
-
-
-
--- create or alter function updateCost (@hashmap varchar(max), @node varchar(max), @cost bigint)
--- -- updateCost(|A.0|B.99999, 'A', 200) --> |A.200|B.99999
--- -- parameater: hashmap, NodeX, cost
--- -- return hashmap string after update
--- -- Eg. update B to 65121
--- returns table as return
--- with cte as (
--- select 
--- node = PARSENAME([value], 2)
--- , val = PARSENAME([value], 1)
--- from string_split(@hashmap, '|') _
--- where [value] != ''
--- ), updates as (
--- select 
--- node
--- , val
--- from cte 
--- where node != @node
--- union 
--- select 
--- @node
--- , @cost
--- ) 
--- select 
--- hashmap = '|' + string_agg(CONCAT_WS('.', node, val), '|') within group (order by node)
--- from updates
-
--- go 
-
-
-
-
--- create or alter function heappush(@heap varchar(max), @newNodeCost varchar(max))
--- --- heappush -- 500.D  --> @heap + @newNodeCost
--- -- parameter: heapString, new nodeX.Cost
--- -- return: heapString after concatenation
--- returns table as return 
--- select heap = CONCAT_WS('|', @heap, @newNodeCost) --  from base
-
-
-
-
-
-
-
--- ; with base as 
--- (select id = 'a' union all select id = 'b') 
--- , cte as 
--- (select * from base
--- union all 
--- select STRING_AGG(id, ',') within group( order by id ) from cte 
--- where id = 'b')
--- select * from cte
-
-
--- ; with base as 
--- (select id = 'a' union all select id = 'b') 
--- , cte as 
--- (select * from base
--- union all  
--- select  t = replace(
---                 replace( (select * from base for XML PATH(''))
---                         , '<id>'
---                         , ''
---                     )
---                 ,'</id>'
---                 , '|')
-          
--- )
--- select * from cte 
-
-
--- cross apply (select nodes_costs = '|' + STRING_AGG(connected_node + '.' + connected_node_cost, '|')
---                                     within group (order by connected_node) 
---             )_string_agg
