@@ -44,7 +44,7 @@ drop table if exists #ins
 
 select 
 step_id.step
-, [action]
+, calc = [action]
 , op1
 , op2
 into #ins 
@@ -67,6 +67,82 @@ where op1 = 'NULL'
 update #ins 
 set op2 = NULL 
 where op2 = 'NULL' 
+
+ 
+
+
+select 
+step
+, calc 
+from #ins A
+where not exists (select * from #ins B where b.calc = a.calc and b.step < a.step)
+order by 1 
+
+
+
+
+select 
+calc 
+, first_app = min(step)
+, total_cnt = count(*)
+from #ins A
+group by calc
+order by  2
+
+
+select * from #ins
+where calc = 'sub'
+
+
+-- store the X and Y into 2 columns 
+-- have a output column to have the current result
+
+-- for below operations - 
+
+-- const - set each item of the current result to that number
+-- var-x, set each item in X to that number
+-- var-y, set each item in Y to that number
+-- mul, X*Y of that step, and store the result to output
+-- add, X+Y of that step, add store the result to output
+-- neg, negate the result of that step and store the result
+-- max, max of X and Y, and store the result to output
+-- square, square each item of the output of the step, and put the result to output 
+-- sqrt, sqrt each item of the output of the step, and put the result to output 
+-- sub, sub X and Y of that step, and store the result to the output
+-- min, get the min of X and Y of that step, and store the result to the output
+
+drop table if exists #base
+
+; with cte as 
+(select 
+step = -1
+, X = REPLICATE('0|', 1024)
+, Y = REPLICATE('0|', 1024)
+, res = REPLICATE('0|', 1024)
+union all
+select
+i.step 
+, X = c.X 
+, Y = c.Y
+, c.res
+from cte c inner join #ins i 
+on c.step = i.step - 1 
+) 
+select * 
+into #base 
+from cte 
+order by step 
+OPTION (maxrecursion 0)
+
+
+
+select * from #base 
+where step < 10 
+
+
+select * from #ins 
+where step < 10 
+
 
 
 
