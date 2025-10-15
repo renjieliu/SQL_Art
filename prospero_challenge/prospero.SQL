@@ -119,10 +119,28 @@ from (values (1, 128)) _ (f_x, f_y)
 -- var-y = -1
 
 
+SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
+SELECT cast(CONVERT(varbinary, '0x0F', 1) as int) -- OK
+SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
+SELECT cast(CONVERT(varbinary, 'F', 2) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
+SELECT cast(CONVERT(varbinary, '0xF', 1) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
 
--- select cast(convert(varbinary, '0x12', 1) as int)
 
-select * from prospero_instruction
+
+drop table if exists #prospero
+
+select 
+step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
+, 
+* 
+into #prospero
+from prospero_instruction
+cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
+cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
+
+
+
+select * from prospero_instruction order by convert(int, (CONVERT(varbinary, REPLACE(step, '_', ''), 1) ) )
 
 -- alter table prospero_instruction add res varchar(100)
 
@@ -130,4 +148,4 @@ select * from #grid_x
 select * from #grid_y 
 
 
-commit 
+-- commit 
