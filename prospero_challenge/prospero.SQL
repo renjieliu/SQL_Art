@@ -120,8 +120,14 @@ from (values (1, 128)) _ (f_x, f_y)
 
 
 
+-- select cast(convert(varbinary, '0x12', 1) as int)
+
+select * from prospero_instruction
+
+-- alter table prospero_instruction add res varchar(100)
+
+select * from #grid_x
+select * from #grid_y 
 
 
-
-
-
+commit 
