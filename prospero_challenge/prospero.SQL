@@ -7,6 +7,7 @@
    4.2 from up to down, the number is 1 to -1
    4.3 for each point, there should be 2 numbers, one is from X-axis, one is from Y-axis. These 2 numbers will be used for calculation later
 5. for each point in the panel, go through the prospero instruction, get the result
+    -- go through the instruction, put the result of each step into a column
 6. generate the final output
 */
 
@@ -76,12 +77,14 @@ from (values (1, 128)) _ (f_x, f_y)
 
 
 
-select * from #grid_x 
+-- select * from #grid_x 
 
-select * from #grid_y 
-where [row] = 100
+-- select * from #grid_y 
+-- where [row] = 100
 
 
+
+-
 
 -- _0 const 2.95
 -- _1 var-x
@@ -116,8 +119,6 @@ where [row] = 100
 -- var-y = -1
 
 
-
-select * from u_split_string('var-x', ' ')
 
 
 
