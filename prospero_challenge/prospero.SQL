@@ -149,3 +149,21 @@ select * from #grid_y
 
 
 -- commit 
+
+drop table if exists #step_lookup 
+
+select distinct step, step_id into #step_lookup from #prospero 
+
+
+select * from #step_lookup 
+
+select 
+step_id
+, step
+, op = [action]
+, op1
+, op2
+, res 
+from #prospero p1
+order by 1
+
