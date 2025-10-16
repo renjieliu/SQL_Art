@@ -179,21 +179,29 @@ on x.[row] = y.[row] and x.col = y.col
 ; with cte as 
 (
 select 
-n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) + '^' + op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
 within group(order by step_id) 
+, x= 1
+, y = 1 
 from #prospero, #grid 
-where col = 1 and row = 1
+where col = 1 and row = 1  -- x = 1, y = 1
 ) 
 select
-step_id = left(ap1.t , CHARINDEX('^', ap1.t) -1  )
-, ap3.*
+step_id = step_id.val
+, op = op.val
+, op1 = op1.val
+, op2 = op2.val
 from cte cross apply 
-    (select t = value from string_split( n, '`') ) ap1  
-    cross apply 
-    (select v = SUBSTRING(ap1.t, CHARINDEX('^', ap1.t)+1, len(ap1.t))) ap2 
+    (select v = value from string_split( n, '`') ) ap1  
     cross apply  
-    (select * from u_split_string(ap2.v, '|')) ap3 
-where t like cast('16' as varchar ) + '^%'
+    (select * from u_split_string(ap1.v, '|') where id = 1) step_id
+    cross apply  
+    (select * from u_split_string(ap1.v, '|') where id = 2) op
+    cross apply  
+    (select * from u_split_string(ap1.v, '|') where id = 3) op1
+    cross apply  
+    (select * from u_split_string(ap1.v, '|') where id = 4) op2
+where ap1.v like cast('15' as varchar ) + '|%'
  
 
 
@@ -226,6 +234,9 @@ where t like cast('16' as varchar ) + '^%'
 -- Below is the computation logic for each opeartion
 -- Need to have a function to get the value of op1 and op2
 
+--var-x = -1 
+--var-y = -1
+
 select 
 step_id
 , step
@@ -242,9 +253,7 @@ step_id
              when op = 'var-y' then y
              else 'Check'
             end
-from #prospero
-
-
+from #prospero 
 
 
 select op , * from #prospero 
@@ -255,4 +264,7 @@ select distinct op from #prospero
 order by 1 
 
 
+
+select * from #prospero 
+order by 1 
 
