@@ -132,8 +132,8 @@ select
 step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
 ,  step
 , op = [action] 
-, op1 = case when op1 = 'NULL' then NULL else op1 end
-, op2 = case when op2 = 'NULL' then NULL else op2 end
+, op1 = case when op1 = 'NULL' then '' else op1 end
+, op2 = case when op2 = 'NULL' then '' else op2 end
 , res
 into #prospero
 from prospero_instruction
@@ -201,9 +201,35 @@ from cte cross apply
     (select * from u_split_string(ap1.v, '|') where id = 3) op1
     cross apply  
     (select * from u_split_string(ap1.v, '|') where id = 4) op2
-where ap1.v like cast('15' as varchar ) + '|%'
- 
+where ap1.v like cast('15' as varchar ) + '|%' -- this is to find the id-related info
 
+
+
+
+; with cte as (
+select 
+n_real_val = STRING_AGG( cast( CONCAT_WS('|', cast(step as varchar) , op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+within group(order by step_id) 
+, x = 1
+, y = 1 
+from #prospero, #grid 
+where col = 1 and row = 1  -- x = 1, y = 1
+) 
+select
+ap1.v
+, step_id = step_id.val
+, res.val
+from cte cross apply 
+    (select v = value from string_split(n_real_val, '`') ) ap1  
+    cross apply  
+    (select * from u_split_string(ap1.v, '|') where id = 1) step_id
+    OUTER apply  
+    (select * from u_split_string(ap1.v, '|') where id = 5) res
+where ap1.v like cast('_12f' as varchar ) + '|%' -- this is to find the id-related info
+
+
+
+select * from #prospero where step = '_12f'
 
 -- alter function getStep(@all varchar(max), @step varchar(10))
 -- returns table as 
@@ -267,4 +293,6 @@ order by 1
 
 select * from #prospero 
 order by 1 
+
+
 
