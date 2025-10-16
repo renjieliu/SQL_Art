@@ -69,6 +69,17 @@ select * into #grid_y from cte_grid_y
 option (maxrecursion 0 )
 
 
+
+
+
+drop table if exists #grid 
+
+select x.[row], x.col, x = x.val, y = y.val 
+into #grid
+from #grid_x x inner join #grid_y y 
+on x.[row] = y.[row] and x.col = y.col
+
+
 -- select 
 --  x = (select val from #grid_x where row = f_y and col = f_x)
 -- , y = (select val from #grid_y where row = f_y  and col = f_y)
@@ -148,7 +159,7 @@ cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_
 -- order by 1
 
 
-commit 
+-- commit 
 -- select * from prospero_instruction order by convert(int, (CONVERT(varbinary, REPLACE(step, '_', ''), 1) ) )
 
 
@@ -166,13 +177,70 @@ drop table if exists #step_lookup
 select distinct step, step_id into #step_lookup from #prospero 
 
 
+go 
+
+
+
+
+
+create or alter function prospero_get_node_res(@concated varchar(max), @node varchar(100))
+returns table 
+as 
+return 
+
+select res = res.val from 
+    (select op_by_step = value from string_split(@concated, '`') ) ap1  
+    cross apply  
+    (select val from u_split_string(ap1.op_by_step, '|') where id = 5) res
+where op_by_step like @node+ '|%'
+
+go 
+
+
+
+
+
+
+
+
+; with cte as 
+(
+select 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+within group(order by step_id) 
+, x= 1
+, y = 1 
+from #prospero, #grid 
+where col = 1 and row = 1  -- x = 1, y = 1
+) 
+select ap1.* from cte cross apply 
+    (select * from prospero_get_node_value(n, 8)) ap1
+
+
+
+
+
+create or alter function prospero_get_node_res(@concated varchar(max), @node varchar(100))
+returns table 
+as 
+return 
+
+select res = res.val from 
+    (select op_by_step = value from string_split(@concated, '`') ) ap1  
+    cross apply  
+    (select val from u_split_string(ap1.op_by_step, '|') where id = 5) res
+where op_by_step like @node+ '|%'
+
+go 
+
+
+
+
+
+-- commit 
+
 -- select * from #step_lookup 
 
-drop table if exists #grid 
-
-select x.[row], x.col, x = x.val, y = y.val into #grid
-from #grid_x x inner join #grid_y y 
-on x.[row] = y.[row] and x.col = y.col
 
 -- select * from #grid 
 
