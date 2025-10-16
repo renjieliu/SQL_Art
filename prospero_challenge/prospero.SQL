@@ -12,6 +12,16 @@
 */
 
 
+--select * from prospero_instruction 
+--where op1 like '%e[+-]%' or op2 like '%e[+-]%'
+
+--update prospero_instruction set op1 = '100000000'
+--where step = '_1134'
+
+--update prospero_instruction set op1 = cast( cast( 4.76837 /  power(10, 7) as decimal(38,10)) as varchar(100))
+--where step = '_1069'
+
+
 
 drop table if exists #tmp_space
 
@@ -185,7 +195,7 @@ select res = res.val from
     (select op_by_step = value from string_split(@concated, '`') ) ap1  
     outer apply  
     (select val from u_split_string(ap1.op_by_step, '|') where id = 5) res
-where op_by_step like @step+ '|%'
+where op_by_step like @step + '|%'
 
 go 
 
@@ -299,7 +309,7 @@ from
     outer apply  -- using outapply in case op1 does not exist
     (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
 	outer apply
-	(select op1 = case when isnull(op1_base.val, '') not like '`_%' escape '`' then op1_base.val -- if it's not a reference
+	(select op1 = case when isnull(op1_base.val, '') not like '`_%' escape '`' then cast(op1_base.val as decimal(38, 10)) -- if it's not a reference
 					   else (
 							 select res from prospero_get_step_res(@concat
 																	, 
@@ -313,7 +323,7 @@ from
     outer apply  
     (select val from u_split_string(ap1.step_op, '|') where id = 4) op2_base 
 	outer apply  -- using outapply in case op2 does not exist
-	(select op2 = case when isnull(op2_base.val, '') not like '`_%' escape '`' then op2_base.val -- if it's not a reference
+	(select op2 = case when isnull(op2_base.val, '') not like '`_%' escape '`' then cast(op2_base.val as decimal(38, 10))-- if it's not a reference
 					   else (
 							 select res from prospero_get_step_res(@concat
 																	, 
@@ -386,7 +396,7 @@ return
 with cte as 
 (
 select 
-curr_step = 1
+curr_step = 0
 , res = @concat 
 
 union all 
@@ -394,20 +404,44 @@ union all
 select curr_step + 1 
 , updated.updated_res
 from cte
-	cross apply (select comp_res = res from prospero_compute_step(res, curr_step, @x, @y) ) comp
-	cross apply (select updated_res  from prospero_update_step_res(res, curr_step, comp_res) ) updated
+	cross apply (select comp_res = res from prospero_compute_step(res, cast(curr_step as int), @x, @y) ) comp
+	cross apply (select updated_res  from prospero_update_step_res(res, cast(curr_step as int), comp_res ) ) updated
 where curr_step < @total_iter
 ) 
 select 
 * 
 from cte
-where curr_step = @total_iter 
+--where curr_step = @total_iter 
 
 
 
 go 
 
 
+
+
+ 
+; with cte as 
+(
+	select 
+	n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar), op, isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') within group(order by step_id) 
+	, x = 1
+	, y = 1
+	from #prospero, #grid 
+	where col = 1 and row = 1    and step_id between 0 and 10-- x = 1, y = 1
+) 
+select 
+*
+from cte cross apply 
+   (select * from prospero_wrap(n, (select count(*) from #prospero), x, y)) res
+option (maxrecursion 0)
+
+
+
+
+
+
+--------------------------------------------------------
 
 ; with cte as 
 (
@@ -419,34 +453,34 @@ go
 	where col = 1 and row = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
 ) 
 select 
-step_op, op1_base.*, op0, turn,  op_final
+*
 from cte cross apply 
 
-   (select step_op = value from string_split(n, '`') ) ap1  
-    cross apply  
-    (select val from u_split_string(ap1.step_op, '|') where id = 1) step_id
-    cross apply  
-    (select val from u_split_string(ap1.step_op, '|') where id = 2) op
-    outer apply  -- using outapply in case op1 does not exist
-    (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
-	outer apply
-	(select 
+ --  (select step_op = value from string_split(n, '`') ) ap1  
+ --   cross apply  
+ --   (select val from u_split_string(ap1.step_op, '|') where id = 1) step_id
+ --   cross apply  
+ --   (select val from u_split_string(ap1.step_op, '|') where id = 2) op
+ --   outer apply  -- using outapply in case op1 does not exist
+ --   (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
+	--outer apply
+	--(select 
 						   
-		op0 =   cast( case when isnull(op1_base.val, '') not like '`_%' escape '`' then op1_base.val -- if it's not a reference
-					   else 					   
-					    iif( len(op1_base.val) % 2 = 1, '', '0') + replace(op1_base.val, '_', '')
+	--	op0 =   cast( case when isnull(op1_base.val, '') not like '`_%' escape '`' then op1_base.val -- if it's not a reference
+	--				   else 					   
+	--				    iif( len(op1_base.val) % 2 = 1, '', '0') + replace(op1_base.val, '_', '')
 			   
-				end as varchar(max))
-			, turn = case when isnull(op1_base.val, '') like '`_%' escape '`' then 1 else 0  end 
-	) op_t
-	outer apply
-	(select 
-	 op_final = case when turn = 1 then try_cast( try_cast(TRY_CONVERT(varbinary, op0, 2) as int) as decimal(38, 10))
-				else cast(op0 as decimal(38, 10)) end 
-	 ) op_ref 
+	--			end as varchar(max))
+	--		, turn = case when isnull(op1_base.val, '') like '`_%' escape '`' then 1 else 0  end 
+	--) op_t
+	--outer apply
+	--(select 
+	-- op_final = case when turn = 1 then try_cast( try_cast(TRY_CONVERT(varbinary, op0, 2) as int) as decimal(38, 10))
+	--			else cast(op0 as decimal(38, 10)) end 
+	-- ) op_ref 
 	 
 
-   --  (select * from prospero_wrap(n, (select count(*) from #prospero), x, y)) res
+   (select * from prospero_wrap(n, (select count(*) from #prospero), x, y)) res
 option (maxrecursion 0)
 
 
