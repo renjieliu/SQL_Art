@@ -435,7 +435,7 @@ go
 	, x = 1
 	, y = 1
 	from #prospero, #grid 
-	where col = 1 and row = 1  -- and step_id between 0 and 100-- x = 1, y = 1
+	where col = 1 and row = 1   -- and step_id between 0 and 1000-- x = 1, y = 1
 ) 
 select 
 ans.res
