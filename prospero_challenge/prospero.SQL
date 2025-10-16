@@ -181,6 +181,8 @@ go
 
 
 
+-- select * from #step_lookup 
+
 
 
 create or alter function prospero_get_node_res(@concated varchar(max), @node varchar(100))
@@ -197,8 +199,7 @@ where op_by_step like @node+ '|%'
 go 
 
 
-
-
+commit 
 
 
 
@@ -218,29 +219,149 @@ select ap1.* from cte cross apply
 
 
 
+go 
 
 
-create or alter function prospero_get_node_res(@concated varchar(max), @node varchar(100))
+
+create or alter function prospero_update_node_res(@concat varchar(max), @node varchar(100), @res_val varchar(100))
 returns table 
 as 
 return 
-
-select res = res.val from 
-    (select op_by_step = value from string_split(@concated, '`') ) ap1  
+with cte as (
+select 
+op_by_step 
+, step_res = string_agg(res.val , '|') within group (order by id)
+from 
+    (select op_by_step = value from string_split(@concat, '`')) ap1  -- split the string into steps
     cross apply  
-    (select val from u_split_string(ap1.op_by_step, '|') where id = 5) res
+    (
+	 select id, val from u_split_string( ap1.op_by_step, '|') where id != 5 -- for the target step, split into op, op1, op2... 
+		union
+	 select 5, @res_val	-- put the value to the spot, the result value is on 5th column
+	) res
 where op_by_step like @node+ '|%'
+group by op_by_step
+)
+select 
+updated_res = stuff(@concat -- the original string
+				  , charindex('`' + @node+ '|' , @concat)+1 -- starting from this node position
+				  , len(op_by_step)  -- the node string length
+				  , step_res  --concated the updated node string 
+				  )
+from cte
 
 go 
 
 
 
+; with cte as 
+(
+select 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+within group(order by step_id) 
+, x= 1
+, y = 1 
+from #prospero, #grid 
+where col = 1 and row = 1  -- x = 1, y = 1
+) 
+select ap1.* from cte cross apply 
+    (select * from prospero_update_node_res(n, 2, 1000)) ap1
 
+
+
+go 
+
+
+
+create or alter function prospero_compute_node(@concat varchar(max), @step varchar(100), @x varchar(100), @y varchar(100))
+returns table 
+as return 
+select
+step_id = step_id.val
+, op = op.val
+, op1_base = op1_base.val 
+, op2_base = op2_base.val
+, op1_ref = op1_ref.op1
+, op2_ref = op2_ref.op2
+, op1 = op1_final.op1 
+, op2 = op2_final.op2 
+, res =  case when op.val ='const' then op1_final.op1
+              when op.val = 'add' then op1_final.op1 + op2_final.op2 
+              when op.val = 'max' then iif(op1_final.op1 >= op2_final.op2, op1_final.op1, op2_final.op2)
+              when op.val = 'min' then iif(op1_final.op1 <= op2_final.op2, op1_final.op1, op2_final.op2) 
+              when op.val = 'mul' then op1_final.op1 * op2_final.op2
+              when op.val = 'neg' then -op1_final.op1
+              when op.val = 'sqrt' then power(op1_final.op1, 0.5)
+              when op.val = 'square' then power(op1_final.op1,  2)
+              when op.val = 'sub' then op1_final.op1 - op2_final.op2
+              when op.val = 'var-x' then cast(@x as decimal(38, 10))
+              when op.val = 'var-y' then cast(@y as decimal(38, 10))
+              else -999999999
+            end
+
+from 
+    (select step_op = value from string_split(@concat, '`') ) ap1  
+    cross apply  
+    (select val from u_split_string(ap1.step_op, '|') where id = 1) step_id
+    cross apply  
+    (select val from u_split_string(ap1.step_op, '|') where id = 2) op
+    outer apply  -- using outapply in case op1 does not exist
+    (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
+	outer apply
+	(select op1 = case when op1_base.val not like '`_%' escape '`' then op1_base.val -- if it's not a reference
+					   else (
+							 select res from prospero_get_node_res(@concat
+																	, 
+																  (cast( convert( varbinary, iif( len(op1_base.val) % 2 = 0, '', '0') + op1_base.val, 2) as int)) 
+																  )-- if it's a reference, get the res from the @concat
+						    )
+					   end 			
+     ) op1_ref
+	outer apply
+	(select op1 = cast(op1_ref.op1 as decimal(38, 10))) op1_final
+    outer apply  
+    (select val from u_split_string(ap1.step_op, '|') where id = 4) op2_base 
+	outer apply  -- using outapply in case op2 does not exist
+	(select op2 = case when op2_base.val not like '`_%' escape '`' then op2_base.val -- if it's not a reference
+					   else (
+							 select res from prospero_get_node_res(@concat
+																	, 
+																  (cast( convert( varbinary, iif( len(op2_base.val) % 2 = 0, '', '0') + op2_base.val, 2) as int)) 
+																  )-- if it's a reference, get the res from the @concat
+						    )
+					   end 			
+     ) op2_ref
+	outer apply 
+	(select op2 =cast(op2_ref.op2 as decimal(38, 10))) op2_final
+
+where ap1.step_op like @step  + '|%' 
+
+
+
+
+go 
+
+
+
+; with cte as 
+(
+select 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, '')) as varchar(max)), '`') 
+within group(order by step_id) 
+, x= 1
+, y = 1 
+from #prospero, #grid 
+where col = 1 and row = 1  -- x = 1, y = 1
+) 
+select * from cte cross apply 
+	-- (select step_op = value from string_split(n, '`') ) ap0  outer apply 
+    (select * from prospero_compute_node(n, 1, x, y)) ap1
 
 -- commit 
 
 -- select * from #step_lookup 
 
+select * from #prospero
 
 -- select * from #grid 
 
