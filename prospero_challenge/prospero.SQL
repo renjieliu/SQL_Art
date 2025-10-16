@@ -41,7 +41,6 @@ drop table if exists #grid_x
 select * into #grid_x from cte_grid_x 
 option (maxrecursion 0)
 
-
 -- for grid_y, it's a transpose of the space array, and repeat for 128 times
 
 drop table if exists #grid_y
@@ -70,10 +69,10 @@ select * into #grid_y from cte_grid_y
 option (maxrecursion 0 )
 
 
-select 
- x = (select val from #grid_x where row = f_y and col = f_x)
-, y = (select val from #grid_y where row = f_y  and col = f_y)
-from (values (1, 128)) _ (f_x, f_y)
+-- select 
+--  x = (select val from #grid_x where row = f_y and col = f_x)
+-- , y = (select val from #grid_y where row = f_y  and col = f_y)
+-- from (values (1, 128)) _ (f_x, f_y)
 
 
 
@@ -119,11 +118,11 @@ from (values (1, 128)) _ (f_x, f_y)
 -- var-y = -1
 
 
-SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
-SELECT cast(CONVERT(varbinary, '0x0F', 1) as int) -- OK
-SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
-SELECT cast(CONVERT(varbinary, 'F', 2) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
-SELECT cast(CONVERT(varbinary, '0xF', 1) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
+-- SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
+-- SELECT cast(CONVERT(varbinary, '0x0F', 1) as int) -- OK
+-- SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
+-- SELECT cast(CONVERT(varbinary, 'F', 2) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
+-- SELECT cast(CONVERT(varbinary, '0xF', 1) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
 
 
 
@@ -131,8 +130,11 @@ drop table if exists #prospero
 
 select 
 step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
-, 
-* 
+,  step
+, op = [action] 
+, op1 = case when op1 = 'NULL' then NULL else op1 end
+, op2 = case when op2 = 'NULL' then NULL else op2 end
+, res
 into #prospero
 from prospero_instruction
 cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
@@ -140,12 +142,21 @@ cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_
 
 
 
-select * from prospero_instruction order by convert(int, (CONVERT(varbinary, REPLACE(step, '_', ''), 1) ) )
+-- select 
+-- * 
+-- from #prospero p1
+-- order by 1
 
+
+commit 
+-- select * from prospero_instruction order by convert(int, (CONVERT(varbinary, REPLACE(step, '_', ''), 1) ) )
+
+
+-- select * from #prospero
 -- alter table prospero_instruction add res varchar(100)
 
-select * from #grid_x
-select * from #grid_y 
+-- select * from #grid_x
+-- select * from #grid_y 
 
 
 -- commit 
@@ -155,15 +166,94 @@ drop table if exists #step_lookup
 select distinct step, step_id into #step_lookup from #prospero 
 
 
-select * from #step_lookup 
+-- select * from #step_lookup 
+
+drop table if exists #grid 
+
+select x.[row], x.col, x = x.val, y = y.val into #grid
+from #grid_x x inner join #grid_y y 
+on x.[row] = y.[row] and x.col = y.col
+
+
+-- select * from #grid 
+
+; with cte as 
+(
+select 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) + '^' + op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+within group(order by step_id) 
+from #prospero, #grid 
+where col = 1 and row = 1
+) 
+select
+step_id = left(ap1.t , CHARINDEX('^', ap1.t) -1  )
+, ap3.*
+from cte cross apply 
+    (select t = value from string_split( n, '`') ) ap1  
+    cross apply 
+    (select v = SUBSTRING(ap1.t, CHARINDEX('^', ap1.t)+1, len(ap1.t))) ap2 
+    cross apply  
+    (select * from u_split_string(ap2.v, '|')) ap3 
+where t like cast('16' as varchar ) + '^%'
+ 
+
+
+-- alter function getStep(@all varchar(max), @step varchar(10))
+-- returns table as 
+-- return 
+--  select * from string_split()
+
+-- concate the prospero operations into a string
+-- for each iteration, get the step from the string
+-- get the op
+-- compute op1
+-- compute op2
+-- put the result to res 
+-- return the string to the calling function and go to the next iteration 
+
+
+-- add
+-- const
+-- max
+-- min
+-- mul
+-- neg
+-- sqrt
+-- square
+-- sub
+-- var-x
+-- var-y
+
+-- Below is the computation logic for each opeartion
+-- Need to have a function to get the value of op1 and op2
 
 select 
 step_id
 , step
-, op = [action]
-, op1
-, op2
-, res 
-from #prospero p1
-order by 1
+, res = case when op ='const' then op1
+             when op = 'add' then op1 + op2 
+             when op = 'max' then iif(op1 >= op2, op1, op2)
+             when op = 'min' then iif(op1 <= op2, op1, op2) 
+             when op = 'mul' then op1 * op2
+             when op = 'neg' then -op1
+             when op = 'sqrt' then power(op1, 0.5)
+             when op = 'square' then power(op1,  2)
+             when op = 'sub' then op1 - op2
+             when op = 'var-x' then x
+             when op = 'var-y' then y
+             else 'Check'
+            end
+from #prospero
+
+
+
+
+select op , * from #prospero 
+where op = 'sqrt'
+order by 1 
+
+select distinct op from #prospero 
+order by 1 
+
+
 
