@@ -174,7 +174,7 @@ select x.[row], x.col, x = x.val, y = y.val into #grid
 from #grid_x x inner join #grid_y y 
 on x.[row] = y.[row] and x.col = y.col
 
-
+.
 -- select * from #grid 
 
 ; with cte as 
