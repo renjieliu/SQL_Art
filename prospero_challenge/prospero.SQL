@@ -257,20 +257,17 @@ go
 select 
 n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar), isnull(op, ''), isnull(op1,''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') 
 within group(order by step_id) 
-, x= 1
+, x = 1
 , y = 1 
 from #prospero, #grid 
 where col = 1 and row = 1  -- x = 1, y = 1
 )   
-select op_by_step = value from string_split(n, '`')  ap1  -- split the string into steps
-cross apply  
-(
-	select id, val from prospero_string_split( ap1.op_by_step, '|', 1) where id != 5 -- for the target step, split into op, op1, op2... 
-) _	 
-where op_by_step like '2'+ '|%'
-
-
-
+--select op_by_step = value from string_split(n, '`')  ap1  -- split the string into steps
+--cross apply  
+--(
+--	select id, val from prospero_string_split( ap1.op_by_step, '|', 1) where id != 5 -- for the target step, split into op, op1, op2... 
+--) _	 
+--where op_by_step like '2'+ '|%'
 select ap1.* from cte cross apply 
     (select * from prospero_update_node_res(n, 2, 1000)) ap1
 
@@ -415,7 +412,7 @@ select curr_step + 1
 from cte
 	cross apply (select comp_res = res from prospero_compute_step(res, cast(curr_step as int), @x, @y) ) comp
 	cross apply (select updated_res from prospero_update_step_res(res, cast(curr_step as int), comp_res ) ) updated
-where curr_step < @total_iter
+where curr_step <= @total_iter
 ) 
 select 
 * 
@@ -434,15 +431,18 @@ go
 (
 	select 
 	n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar), op, isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') within group(order by step_id) 
+	, cnt = count(step_id)-1
 	, x = 1
 	, y = 1
 	from #prospero, #grid 
-	where col = 1 and row = 1    and step_id between 0 and 10-- x = 1, y = 1
+	where col = 1 and row = 1  -- and step_id between 0 and 100-- x = 1, y = 1
 ) 
 select 
-*
+ans.res
 from cte cross apply 
-   (select * from prospero_wrap(n, (select count(*) from #prospero), x, y)) res
+   (select * from prospero_wrap(n, (select cnt-1 from cte), x, y)) res cross apply -- prospero 
+   (select * from prospero_get_step_res(res.res, (select cnt-1 from cte) ) ) ans
+ where curr_step = cte.cnt
 option (maxrecursion 0)
 
 
