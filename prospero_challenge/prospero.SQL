@@ -194,7 +194,7 @@ return
 select res = res.val from 
     (select op_by_step = value from string_split(@concated, '`') ) ap1  
     outer apply  
-    (select val from u_split_string(ap1.op_by_step, '|') where id = 5) res
+    (select val from prospero_string_split(ap1.op_by_step, '|', 1) where id = 5) res
 where op_by_step like @step + '|%'
 
 go 
@@ -233,7 +233,7 @@ from
     (select op_by_step = value from string_split(@concat, '`')) ap1  -- split the string into steps
     cross apply  
     (
-	 select id, val from u_split_string( ap1.op_by_step, '|') where id != 5 -- for the target step, split into op, op1, op2... 
+	 select id, val from prospero_string_split( ap1.op_by_step, '|', 1) where id != 5 -- for the target step, split into op, op1, op2... 
 		union
 	 select 5, @res_val	-- put the value to the spot, the result value is on 5th column
 	) res
@@ -255,13 +255,22 @@ go
 ; with cte as 
 (
 select 
-n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, 'NULL')) as varchar(max)), '`') 
+n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar), isnull(op, ''), isnull(op1,''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') 
 within group(order by step_id) 
 , x= 1
 , y = 1 
 from #prospero, #grid 
 where col = 1 and row = 1  -- x = 1, y = 1
-) 
+)   
+select op_by_step = value from string_split(n, '`')  ap1  -- split the string into steps
+cross apply  
+(
+	select id, val from prospero_string_split( ap1.op_by_step, '|', 1) where id != 5 -- for the target step, split into op, op1, op2... 
+) _	 
+where op_by_step like '2'+ '|%'
+
+
+
 select ap1.* from cte cross apply 
     (select * from prospero_update_node_res(n, 2, 1000)) ap1
 
@@ -303,11 +312,11 @@ step_id = step_id.val
 from 
     (select step_op = value from string_split(@concat, '`') ) ap1  
     cross apply  
-    (select val from u_split_string(ap1.step_op, '|') where id = 1) step_id
+    (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 1) step_id
     cross apply  
-    (select val from u_split_string(ap1.step_op, '|') where id = 2) op
+    (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 2) op
     outer apply  -- using outapply in case op1 does not exist
-    (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
+    (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 3) op1_base
 	outer apply
 	(select op1 = case when isnull(op1_base.val, '') not like '`_%' escape '`' then cast(op1_base.val as decimal(38, 10)) -- if it's not a reference
 					   else (
@@ -321,7 +330,7 @@ from
 	outer apply
 	(select op1 = cast(op1_ref.op1 as decimal(38, 10))) op1_final
     outer apply  
-    (select val from u_split_string(ap1.step_op, '|') where id = 4) op2_base 
+    (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 4) op2_base 
 	outer apply  -- using outapply in case op2 does not exist
 	(select op2 = case when isnull(op2_base.val, '') not like '`_%' escape '`' then cast(op2_base.val as decimal(38, 10))-- if it's not a reference
 					   else (
@@ -405,7 +414,7 @@ select curr_step + 1
 , updated.updated_res
 from cte
 	cross apply (select comp_res = res from prospero_compute_step(res, cast(curr_step as int), @x, @y) ) comp
-	cross apply (select updated_res  from prospero_update_step_res(res, cast(curr_step as int), comp_res ) ) updated
+	cross apply (select updated_res from prospero_update_step_res(res, cast(curr_step as int), comp_res ) ) updated
 where curr_step < @total_iter
 ) 
 select 
@@ -458,11 +467,11 @@ from cte cross apply
 
  --  (select step_op = value from string_split(n, '`') ) ap1  
  --   cross apply  
- --   (select val from u_split_string(ap1.step_op, '|') where id = 1) step_id
+ --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 1) step_id
  --   cross apply  
- --   (select val from u_split_string(ap1.step_op, '|') where id = 2) op
+ --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 2) op
  --   outer apply  -- using outapply in case op1 does not exist
- --   (select val from u_split_string(ap1.step_op, '|') where id = 3) op1_base
+ --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 3) op1_base
 	--outer apply
 	--(select 
 						   
