@@ -84,7 +84,10 @@ option (maxrecursion 0 )
 
 drop table if exists #grid 
 
-select x.[row], x.col, x = x.val, y = y.val 
+select 
+rn = ROW_NUMBER() over(order by x.[row], x.col )
+, 
+x.[row], x.col, x = x.val, y = y.val 
 into #grid
 from #grid_x x inner join #grid_y y 
 on x.[row] = y.[row] and x.col = y.col
@@ -417,30 +420,57 @@ where curr_step <= @total_iter
 select 
 * 
 from cte
---where curr_step = @total_iter 
+where curr_step = @total_iter 
 
 
 
 go 
 
 
+--
 
 
+
+--------------------------------------------------------
+--------------------------------------------------------
+--------------------------------------------------------
 --------------------------------------------------------
 
 ; with cte as 
 (
 	select 
-	n = STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , op, op1, op2, isnull(res, '')) as varchar(max)), '`') within group(order by step_id) 
-	, x = 1
-	, y = 1
-	from #prospero, #grid 
-	where col = 1 and row = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
+      rn
+	, x
+	, y 
+	from #grid --  , #prospero, 
+	-- where rn = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
 ) 
 select 
-*
+rn
+, x
+, y
+, ans = (select res from prospero_get_step_res (curr.res, (select count(*) from #prospero) ))
 from cte cross apply 
+	(select res from prospero_wrap( 
+							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero where step_id <= 10000) -- concated operation string
+							, (select count(*) from #prospero) -- total iteration times
+							, x -- current x
+							, y -- current y
+							)
+	) curr  
+option (maxrecursion 0)
 
+
+--prospero_update_step_res(@concat varchar(max), @step varchar(100), @res_val varchar(100))
+
+
+--goprospero_compute_step
+ 
+
+(
+select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') 
+within group(order by step_id) from #prospero
+)
  --  (select step_op = value from string_split(n, '`') ) ap1  
  --   cross apply  
  --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 1) step_id
@@ -464,13 +494,3 @@ from cte cross apply
 	--			else cast(op0 as decimal(38, 10)) end 
 	-- ) op_ref 
 	 
-
-   (select * from prospero_wrap(n, (select count(*) from #prospero), x, y)) res
-option (maxrecursion 0)
-
-
---prospero_update_step_res(@concat varchar(max), @step varchar(100), @res_val varchar(100))
-
-
---goprospero_compute_step
- 
