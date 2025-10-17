@@ -397,8 +397,8 @@ rn
 into #res
 from cte cross apply 
 	(select res from prospero_wrap( 
-							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero where step_id <= 0) -- concated operation string
-							, (select 1 )  -- )count(*) from #prospero) -- total iteration times
+							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero where step_id between 0 and 100000) -- concated operation string
+							, (select count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
 							)
@@ -408,9 +408,9 @@ option (maxrecursion 0)
 
 
 select
-STRING_AGG(case when ans < 0 then 1 else 0 end, '') within group(order by rn)
+STRING_AGG(cast(case when ans < 0 then 1 else 0 end as varchar(max)), '') within group(order by rn)
 from #res 
-group by ans / 128
+group by rn / 128
 
 
 
