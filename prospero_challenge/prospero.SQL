@@ -443,16 +443,16 @@ go
 	, x
 	, y 
 	from #grid --  , #prospero, 
-	-- where rn = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
+	where rn = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
 ) 
 select 
 rn
 , x
 , y
-, ans = (select res from prospero_get_step_res (curr.res, (select count(*) from #prospero) ))
+, ans = (select res from prospero_get_step_res (curr.res, (select count(*)-1 from #prospero) ))
 from cte cross apply 
 	(select res from prospero_wrap( 
-							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero where step_id <= 10000) -- concated operation string
+							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero ) -- where step_id <= 0) -- concated operation string
 							, (select count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
@@ -460,6 +460,11 @@ from cte cross apply
 	) curr  
 option (maxrecursion 0)
 
+
+select 
+128*128* len((select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero ))
+/1000/1000.0
+-- where step_id <= 0) -- concated operation string)
 
 --prospero_update_step_res(@concat varchar(max), @step varchar(100), @res_val varchar(100))
 
@@ -493,4 +498,4 @@ within group(order by step_id) from #prospero
 	-- op_final = case when turn = 1 then try_cast( try_cast(TRY_CONVERT(varbinary, op0, 2) as int) as decimal(38, 10))
 	--			else cast(op0 as decimal(38, 10)) end 
 	-- ) op_ref 
-	 
+
