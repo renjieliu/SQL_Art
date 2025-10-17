@@ -2,18 +2,40 @@
 
 /* Steps to solve the problem in SQL
 
-1. define the image size, 128 
-2. from -1 to 1, evenly distribute the 128 numbers
-3. generate a panel, from (-1,-1) to (1,1), total points is 128*128 
-4. for each point in the panel, assign the value, based on the calculation on step 2 
+1. Define the image size, 128 
+2. From -1 to 1, evenly distribute the 128 numbers
+3. Generate a grid, from (-1,-1) to (1,1), Total cell number is 128*128 
+4. For each point in the panel, assign the value, based on the calculation on step 2 
    4.1 from left to right, the number is -1 to 1 
    4.2 from up to down, the number is 1 to -1
    4.3 for each point, there should be 2 numbers, one is from X-axis, one is from Y-axis. These 2 numbers will be used for calculation later
-5. for each point in the panel, go through the prospero instruction, get the result
-    -- go through the instruction, put the result of each step into a column
-6. generate the final output
+5. For each point in the panel, go through the whole prospero instruction, get the result
+    -- All the operations will have step_id, operation, op1, op2 and result
+    -- Concatenate the entire prospero instruction as a string , each step delimited with `, and for each step, step id, operand, and result are delimited with |
+    -- For the current step, unpack the concat string, get the current step 
+    -- Get the op1 and op2, if it's a reference to the previous step, get the result of the corresponding step, with prospero_get_step_res
+    -- Compute current operation
+    -- Update the concatenated string, this string will be used for next iteration in the recursive CTE
+    -- Get the result with step_id = total_count-1 from the prospero table
+
+6. The final result will be either 0 or 1 for each point
+    -- 1 if the computed final result is < 0 
+    -- 0 if the computed final resilt is >= 0
+
+7. Generate the final output
+
+
+Takeaways - 
+
+1. In order for the recursive CTE to preserve the previous iteration result, a string is used and updated for each iteration, and the string is then passed to the next iteration
+2. SQL Server will not allow select from a temp table in the cross apply part.
+3. Instead of using a lot of cross apply and recursive CTEs - put the reusable part into a function to make the code cleaner 
+4. Using a wrap function to wrap the compute and update process. So for each point, we can retrive the final output by just calling the wrapper function
+
+
 */
 
+-- clean up the table for the ones imported with scientific notion
 
 --select * from prospero_instruction 
 --where op1 like '%e[+-]%' or op2 like '%e[+-]%'
@@ -96,63 +118,6 @@ from #grid_x x inner join #grid_y y
 on x.[row] = y.[row] and x.col = y.col
 
 
--- select 
---  x = (select val from #grid_x where row = f_y and col = f_x)
--- , y = (select val from #grid_y where row = f_y  and col = f_y)
--- from (values (1, 128)) _ (f_x, f_y)
-
-
-
--- select * from #grid_x 
-
--- select * from #grid_y 
--- where [row] = 100
-
-
-
-
-
--- _0 const 2.95
--- _1 var-x
--- _2 const 8.13008
--- _3 mul _1 _2
--- _4 add _0 _3
--- _5 const 3.675
--- _6 add _5 _3
--- _7 neg _6
--- _8 max _4 _7
--- _9 const 0.175
--- _a neg _4
--- _b square _a
--- _c const 6.025
--- _d var-y
--- _e mul _d _2
--- _f add _c _e
--- _10 square _f
--- _11 add _b _10
--- _12 sqrt _11
--- _13 sub _9 _12
--- _14 max _8 _13
--- _15 const 0.275
--- _16 sub _12 _15
--- _17 max _14 _16
-
--- const case when 2.95 
--- const insert into 8.13 
--- mul = _1 _2
--- var-x = -1 
-
--- var-y = -1
-
-
--- SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
--- SELECT cast(CONVERT(varbinary, '0x0F', 1) as int) -- OK
--- SELECT cast(CONVERT(varbinary, '0F', 2) as int) -- OK
--- SELECT cast(CONVERT(varbinary, 'F', 2) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
--- SELECT cast(CONVERT(varbinary, '0xF', 1) as int) -- failed , as 'F' is odd-length, varbinary requires even-numbered digits
-
-
-
 drop table if exists #prospero
 
 select 
@@ -167,26 +132,6 @@ from prospero_instruction
 cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
 cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
 
-
-
--- select 
--- * 
--- from #prospero p1
--- order by 1
-
-
--- commit 
--- select * from prospero_instruction order by convert(int, (CONVERT(varbinary, REPLACE(step, '_', ''), 1) ) )
-
-
--- select * from #prospero
--- alter table prospero_instruction add res varchar(100)
-
--- select * from #grid_x
--- select * from #grid_y 
-
-
--- select * from #step_lookup 
 
 
 go 
@@ -268,14 +213,8 @@ within group(order by step_id)
 from #prospero, #grid 
 where col = 1 and row = 1  -- x = 1, y = 1
 )   
---select op_by_step = value from string_split(n, '`')  ap1  -- split the string into steps
---cross apply  
---(
---	select id, val from prospero_string_split( ap1.op_by_step, '|', 1) where id != 5 -- for the target step, split into op, op1, op2... 
---) _	 
---where op_by_step like '2'+ '|%'
 select ap1.* from cte cross apply 
-    (select * from prospero_update_node_res(n, 2, 1000)) ap1
+    (select * from prospero_update_step_res(n, 2, 1000)) ap1
 
 
 
@@ -375,8 +314,8 @@ select * from cte cross apply
 
 -- select * from #step_lookup 
 
-select * from #prospero
-where step_id between 4403 and 4406
+-- select * from #prospero
+-- where step_id between 4403 and 4406
 
 --select op , * from #prospero 
 --where op = 'sqrt'
@@ -387,8 +326,8 @@ where step_id between 4403 and 4406
 
 
 
-select * from #prospero 
-order by 1 
+-- select * from #prospero 
+-- order by 1 
 
 
 
@@ -439,24 +378,27 @@ go
 --------------------------------------------------------
 --------------------------------------------------------
 
+drop table if exists #res
+
 ; with cte as 
 (
 	select 
       rn
 	, x
 	, y 
-	from #grid --  , #prospero, 
-	where rn = 1  -- and step_id between 4403 and 4406-- x = 1, y = 1
+	from #grid 
+	-- where rn = 1  
 ) 
 select 
 rn
 , x
 , y
 , ans = (select res from prospero_get_step_res (curr.res, (select count(*)-1 from #prospero) ))
+into #res
 from cte cross apply 
 	(select res from prospero_wrap( 
-							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero ) -- where step_id <= 0) -- concated operation string
-							, (select count(*) from #prospero) -- total iteration times
+							  (select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero where step_id <= 0) -- concated operation string
+							, (select 1 )  -- )count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
 							)
@@ -464,41 +406,70 @@ from cte cross apply
 option (maxrecursion 0)
 
 
-select 
-128*128* len((select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero ))
-/1000/1000.0
--- where step_id <= 0) -- concated operation string)
 
---prospero_update_step_res(@concat varchar(max), @step varchar(100), @res_val varchar(100))
+select
+STRING_AGG(case when ans < 0 then 1 else 0 end, '') within group(order by rn)
+from #res 
+group by ans / 128
 
 
---goprospero_compute_step
+
+
+
+
+
+
+-- ######################################################################################
+-- ##########Below are testing code ##################
+-- ######################################################################################
+
+-- ; with a as 
+-- (select 1 id, t = '*'
+-- UNION ALL
+-- select id + 1, t from a
+-- where id < 128*128
+-- )
+-- select STRING_AGG(t, '') within GROUP(order by id ) from a
+-- group by id /128 
+-- OPTION(maxrecursion 0 )
+
+
+
+-- select 
+-- 128*128* len((select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`')  within group(order by step_id) from #prospero ))
+-- /1000/1000.0
+-- -- where step_id <= 0) -- concated operation string)
+
+-- --prospero_update_step_res(@concat varchar(max), @step varchar(100), @res_val varchar(100))
+
+
+-- --goprospero_compute_step
  
 
-(
-select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') 
-within group(order by step_id) from #prospero
-)
- --  (select step_op = value from string_split(n, '`') ) ap1  
- --   cross apply  
- --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 1) step_id
- --   cross apply  
- --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 2) op
- --   outer apply  -- using outapply in case op1 does not exist
- --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 3) op1_base
-	--outer apply
-	--(select 
+-- (
+-- select STRING_AGG( cast( CONCAT_WS('|', cast(step_id as varchar) , isnull(op, ''), isnull(op1, ''), isnull(op2, ''), isnull(res, '')) as varchar(max)), '`') 
+-- within group(order by step_id) from #prospero
+-- )
+--  --  (select step_op = value from string_split(n, '`') ) ap1  
+--  --   cross apply  
+--  --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 1) step_id
+--  --   cross apply  
+--  --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 2) op
+--  --   outer apply  -- using outapply in case op1 does not exist
+--  --   (select val from prospero_string_split(ap1.step_op, '|', 1) where id = 3) op1_base
+-- 	--outer apply
+-- 	--(select 
 						   
-	--	op0 =   cast( case when isnull(op1_base.val, '') not like '`_%' escape '`' then op1_base.val -- if it's not a reference
-	--				   else 					   
-	--				    iif( len(op1_base.val) % 2 = 1, '', '0') + replace(op1_base.val, '_', '')
+-- 	--	op0 =   cast( case when isnull(op1_base.val, '') not like '`_%' escape '`' then op1_base.val -- if it's not a reference
+-- 	--				   else 					   
+-- 	--				    iif( len(op1_base.val) % 2 = 1, '', '0') + replace(op1_base.val, '_', '')
 			   
-	--			end as varchar(max))
-	--		, turn = case when isnull(op1_base.val, '') like '`_%' escape '`' then 1 else 0  end 
-	--) op_t
-	--outer apply
-	--(select 
-	-- op_final = case when turn = 1 then try_cast( try_cast(TRY_CONVERT(varbinary, op0, 2) as int) as decimal(38, 10))
-	--			else cast(op0 as decimal(38, 10)) end 
-	-- ) op_ref 
+-- 	--			end as varchar(max))
+-- 	--		, turn = case when isnull(op1_base.val, '') like '`_%' escape '`' then 1 else 0  end 
+-- 	--) op_t
+-- 	--outer apply
+-- 	--(select 
+-- 	-- op_final = case when turn = 1 then try_cast( try_cast(TRY_CONVERT(varbinary, op0, 2) as int) as decimal(38, 10))
+-- 	--			else cast(op0 as decimal(38, 10)) end 
+-- 	-- ) op_ref 
 
