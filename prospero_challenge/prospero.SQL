@@ -1,4 +1,7 @@
-/* 
+-- Background: https://www.mattkeeter.com/projects/prospero/ 
+
+/* Steps to solve the problem in SQL
+
 1. define the image size, 128 
 2. from -1 to 1, evenly distribute the 128 numbers
 3. generate a panel, from (-1,-1) to (1,1), total points is 128*128 
