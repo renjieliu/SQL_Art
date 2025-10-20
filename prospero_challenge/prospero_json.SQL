@@ -420,17 +420,17 @@ drop table if exists #res
 	, x
 	, y 
 	from #grid 
-	-- where rn = 1  
+	where rn = 1  -- how many points to be iterated
 )
 select 
 rn
 , x
 , y
-, ans = (select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
+, ans = res -- = (select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
 into #res
 from cte cross apply 
 	(select res from prospero_wrap( 
-							(select concat = (select * from #prospero where step_id <= 0 for json path, include_null_values))   --  where step_id between 0 and 100) -- concated operation string
+							(select concat = (select * from #prospero for json path, include_null_values))   --  where step_id between 0 and 100) -- concated operation string
 							, (select count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
@@ -441,9 +441,10 @@ option (maxrecursion 0)
 
 
 select
-STRING_AGG(cast(case when ans < 0 then 1 else 0 end as varchar(max)), '') within group(order by rn)
+* 
+--STRING_AGG(cast(case when ans < 0 then 1 else 0 end as varchar(max)), '') within group(order by rn)
 from #res 
-group by rn / 128
+-- group by rn / 128
 
 
 
