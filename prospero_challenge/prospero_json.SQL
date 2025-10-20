@@ -431,7 +431,7 @@ into #res
 from cte cross apply 
 	(select res from prospero_wrap( 
 							(select concat = (select * from #prospero where step_id <= 0 for json path, include_null_values))   --  where step_id between 0 and 100) -- concated operation string
-							, 1 -- (select count(*) from #prospero) -- total iteration times
+							, (select count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
 							)
