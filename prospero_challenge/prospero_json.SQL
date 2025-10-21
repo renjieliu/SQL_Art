@@ -547,7 +547,7 @@ select
 rn
 , x
 , y
-, ans = res  -- = dbo.prospero_json_get_step_res(curr.res, 9)  --(select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
+, ans = (select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
 into #res
 from cte cross apply 
 	(select res from prospero_json_wrap( 
