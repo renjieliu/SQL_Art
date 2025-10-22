@@ -202,21 +202,21 @@ go
 
 
 
-; with cte as 
-(
-select concat = STRING_AGG(cast(
-                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
-                            , isnull(op, '') + space(30 - len (isnull(op, '')))
-                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
-                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
-                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
-                            ) 
-                            as varchar(max)), '`') 
-                     within group(order by step_id) 
+--; with cte as 
+--(
+--select concat = STRING_AGG(cast(
+--                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
+--                            , isnull(op, '') + space(30 - len (isnull(op, '')))
+--                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
+--                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
+--                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
+--                            ) 
+--                            as varchar(max)), '`') 
+--                     within group(order by step_id) 
         
-from #prospero
-) -- select * from cte
-select ap1.* from cte cross apply (select res = dbo.prospero_string_get_step_items(concat, 5, 5, 30) ) ap1
+--from #prospero
+--) -- select * from cte
+--select ap1.* from cte cross apply (select res = dbo.prospero_string_get_step_items(concat, 5, 5, 30) ) ap1
 
 
 
@@ -249,21 +249,21 @@ go
 ------------ Testing code for prospero_json_update_step_res ------------
 
 
-; with cte as 
-(
-select concat = STRING_AGG(cast(
-                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
-                            , isnull(op, '') + space(30 - len (isnull(op, '')))
-                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
-                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
-                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
-                            ) 
-                            as varchar(max)), '`') 
-                     within group(order by step_id) 
+--; with cte as 
+--(
+--select concat = STRING_AGG(cast(
+--                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
+--                            , isnull(op, '') + space(30 - len (isnull(op, '')))
+--                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
+--                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
+--                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
+--                            ) 
+--                            as varchar(max)), '`') 
+--                     within group(order by step_id) 
         
-from #prospero
-) -- select * from cte
-select ap1.* from cte cross apply (select res = dbo.prospero_string_update_step_res(concat, 7, 6.23111,  30) ) ap1
+--from #prospero
+--) -- select * from cte
+--select ap1.* from cte cross apply (select res = dbo.prospero_string_update_step_res(concat, 7, 6.23111,  30) ) ap1
 
 
 go 
@@ -298,11 +298,11 @@ declare @res decimal(38, 10)
 select
 step_id
 , op
-, op1 = case when left(isnull(op1, ''), 1) <> '_' then cast(op1 as decimal(38, 10)) -- if it's not a reference
+, op1 = case when left(isnull(op1, ''), 1) <> '_' then try_cast(op1 as decimal(38, 10)) -- if it's not a reference
              else rtrim(dbo.prospero_string_get_step_items(@concat, cast(ap1.conv as int), 5, 30)) -- if it's a reference, get the res from the unpacked JSON
 		    end 
 
-, op2 = case when left(isnull(op2, ''), 1) <> '_' then cast(op2 as decimal(38, 10)) -- if it's not a reference
+, op2 = case when left(isnull(op2, ''), 1) <> '_' then try_cast(op2 as decimal(38, 10)) -- if it's not a reference
              else rtrim(dbo.prospero_string_get_step_items(@concat, cast(ap2.conv as int), 5, 30)) -- if it's a reference, get the res from the unpacked JSON
 		    end 
 , res
@@ -321,7 +321,7 @@ cross apply (select conv = convert(varbinary
 			) ap2 
 )
 select @res =  case when op ='const' then op1
-                    when op = 'add' then  op1 + op2 
+                    when op = 'add' then op1 + op2 
                     when op = 'max' then iif( op1 >= op2,  op1, op2)
                     when op = 'min' then iif( op1 <= op2, op1, op2) 
                     when op = 'mul' then op1 *  op2
@@ -345,29 +345,49 @@ go
 
 ------------ Testing code for prospero_json_compute_step ------------
 
-; with cte as 
-(
-select concat = STRING_AGG(cast(
-                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
-                            , isnull(op, '') + space(30 - len (isnull(op, '')))
-                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
-                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
-                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
-                            ) 
-                            as varchar(max)), '`') 
-                     within group(order by step_id) 
+
+
+drop table if exists #prospero
+
+select 
+step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
+, step
+, op = [action] 
+, op1 = case when op1 = 'NULL' then '' else op1 end
+, op2 = case when op2 = 'NULL' then '' else op2 end
+, res
+into #prospero
+from prospero_instruction
+cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
+cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
+
+
+
+
+
+--; with cte as 
+--(
+--select concated = STRING_AGG(cast(
+--                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
+--                            , isnull(op, '') + space(30 - len (isnull(op, '')))
+--                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
+--                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
+--                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
+--                            ) 
+--                            as varchar(max)), '`') 
+--                     within group(order by step_id) 
         
-from #prospero
-) 
-select ap1.* from cte cross apply
-    (select res=dbo.prospero_string_compute_step(concat, 1, 1, 1, 30)) ap1
+--from #prospero
+--) 
+--select ap1.* from cte cross apply
+--(select res=dbo.prospero_string_compute_step(concated, 1, 1, 1, 30)) ap1
  
 
 
 go
 
 
-create or alter function prospero_json_wrap (@concat varchar(max), @total_iter int,   @x varchar(max),  @y varchar(max))
+create or alter function prospero_string_wrap (@concat varchar(max), @total_iter int,   @x varchar(max),  @y varchar(max), @width int)
 returns table  
 as 
 return
@@ -384,8 +404,8 @@ select
 step_id + 1
 , updated.updated_res
 from cte
-	cross apply (select comp_res = dbo.prospero_json_compute_step(res, cast(step_id as int), @x, @y)) comp
-	cross apply (select updated_res = dbo.prospero_json_update_step_res(res, cast(step_id as int), comp_res)) updated
+	cross apply (select comp_res = dbo.prospero_string_compute_step(res, cast(step_id as int), @x, @y, @width)) comp
+	cross apply (select updated_res = dbo.prospero_string_update_step_res(res, cast(step_id as int), comp_res, @width)) updated
 where step_id <= @total_iter
 ) 
 select 
@@ -398,118 +418,23 @@ where step_id = @total_iter
 go 
 
 
---
 
-
---with cte as 
---(
---select 
---curr_step = 0
---, res = cast ( (
---                     select 
---                     p.*
---                     from #prospero p 
---                     where step_id < 5
---                     for json path, include_null_values
---                     ) as varchar(max))
-
---union all 
-
---select 
---curr_step + 1 
---, cast(updated.updated_res as varchar(max))
---from cte
---	cross apply (select comp_res = dbo.prospero_json_compute_step(res, cast(curr_step as int), 1, 1)) comp
---	cross apply (select updated_res = dbo.prospero_json_update_step_res(res, cast(curr_step as int), comp_res)) updated
---where curr_step <= 5
---) 
---select 
---* 
---from cte
+; with cte as 
+(
+select concated = STRING_AGG(cast(
+                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
+                            , isnull(op, '') + space(30 - len (isnull(op, '')))
+                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
+                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
+                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
+                            ) 
+                            as varchar(max)), '`') 
+                     within group(order by step_id) 
+        
+from #prospero
+) 
+select ap1.* from cte cross apply (select * from dbo.prospero_string_wrap(concated, 30, 1, 1, 30)) ap1
  
-
--- select res from prospero_json_wrap( 
---							(select concat = (select * from #prospero for json path, include_null_values))   --  where step_id between 0 and 100) -- concated operation string
---							, 10-- (select count(*) from #prospero) -- total iteration times
---							, 1 -- current x
---							, 1 -- current y
---							)
-
-
-------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------
--------------#########################################################------------------------------
-
-
---drop table if exists #prospero
-
---select 
---step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
---, step
---, op = [action] 
---, op1 = case when op1 = 'NULL' then '' else op1 end
---, op2 = case when op2 = 'NULL' then '' else op2 end
---, res
---into #prospero
---from prospero_instruction
---cross apply (select step_cleaned = upper(REPLACE(step, '_', '') ) ) _
---cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
-
-
- 
---; with base  as 
---(select
---    step_id
---    , step
---    , op
---    , op1
---    , op2
---   , res = case when step_id = 1 then 199 else res end 
---from #prospero )
-
---, cte as
---(
---    select 
---    step_id
---    , step
---    , op
---    , op1
---    , op2
---    , res 
---    from openjson( cast ( (
---                     select 
---                     p.*
---                     from base  p 
---                     where step_id < 5
---                     for json path, include_null_values
---                     ) as varchar(max)))
---        WITH (
---        step_id int
---        , step varchar(100)
---        , op varchar(100)
---        , op1 varchar(100) 
---        , op2 varchar(100) 
---        , res decimal(38, 10)
---        )
---) 
---select
---*
---,xx = case when left(op1, 1 ) <> '_' then op1 
---		   else  (select res  from cte where step_id = cast(ap1.conv as int)) 
---	   end
---from cte c cross apply 
---				(select conv = convert(varbinary
---										, iif( len( case when left(op1, 1 ) = '_' then op1 else NULL end) % 2 = 1, '', '0')
---										  + 
---										  replace( case when left(op1, 1 ) = '_' then op1 else NULL end , '_', '')
---										, 2) 
---										) ap1
- 
-
-------------------------------------------------------------------------------------------
-------------------------------------------------------------------------------------------
--------------#########################################################------------------------------
-
 
 
 --------------------------------------------------------
@@ -527,6 +452,18 @@ drop table if exists #res
 	, y 
 	from #grid 
 	where rn = 1  -- how many points to be iterated
+), cte_concat as 
+(
+select concated = STRING_AGG(cast(
+                    CONCAT_WS('|', cast(step_id as varchar) + space(30 - len (cast(step_id as varchar) ))
+                            , isnull(op, '') + space(30 - len (isnull(op, '')))
+                            , isnull(op1, '')+ space(30 - len (isnull(op1, '') ))
+                            , isnull(op2, '')+ space(30 - len (isnull(op2, '') ))
+                            , isnull(res, '')+ space(30 - len (isnull(res, '') ))
+                            ) 
+                            as varchar(max)), '`') 
+                     within group(order by step_id) 
+from #prospero
 )
 select 
 rn
@@ -535,11 +472,12 @@ rn
 , ans = (select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
 into #res
 from cte cross apply 
-	(select res from prospero_json_wrap( 
-							(select concat = (select * from #prospero for json path, include_null_values))   --  where step_id between 0 and 100) -- concated operation string
+	(select res from prospero_string_wrap( 
+							(select concated  from cte_concat)   --  where step_id between 0 and 100) -- concated operation string
 							, (select count(*) from #prospero) -- total iteration times
 							, x -- current x
 							, y -- current y
+							, 30 -- width
 							)
 	) curr  
 option (maxrecursion 0)
