@@ -469,7 +469,7 @@ select
 rn
 , x
 , y
-, ans = (select res = dbo.prospero_json_get_step_res(curr.res, (select count(*)-1 from #prospero) ))
+, ans = (select res = dbo.prospero_string_get_step_items(curr.res, (select count(*)-1 from #prospero), 5, 30))
 into #res
 from cte cross apply 
 	(select res from prospero_string_wrap( 
