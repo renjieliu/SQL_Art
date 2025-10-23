@@ -1,5 +1,8 @@
 -- Background: https://www.mattkeeter.com/projects/prospero/ 
 
+-- Total running time for one point - 30 minutes 
+
+
 /* Steps to solve the problem in SQL
 
 1. Define the image size, 128 

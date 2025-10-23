@@ -1,5 +1,7 @@
 -- Background: https://www.mattkeeter.com/projects/prospero/ 
 
+-- Total running time for one point - 10 seconds
+
 /* Steps to solve the problem in SQL
 
 1. Define the image size, 128 
@@ -151,11 +153,11 @@ go
 -------------------------------------------------------------------
 
 
-drop table if exists #res
+drop table if exists #final_res
 
 select 
 rn = 0
-, res = cast(null as decimal(38, 10) ) into #res
+, res = cast(null as decimal(38, 10) ) into #final_res
 from #prospero where 1 = 0
 
 create index idx1 on #prospero(step_id)
@@ -249,7 +251,7 @@ begin
 
   END 
  
-  insert into #res 
+  insert into #final_res 
   select 
   @rn
   , res
@@ -261,7 +263,7 @@ begin
 
 END
 
-select * from #res
+select * from #final_res
 
 
 
