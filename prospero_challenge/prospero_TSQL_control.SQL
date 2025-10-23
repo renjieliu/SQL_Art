@@ -128,7 +128,7 @@ step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
 , op2 = case when op2 = 'NULL' then '' else op2 end
 , res
 into #prospero
-from prospero_instruction
+from ARTDEV.renjie.prospero_instruction
 cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
 cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
 
@@ -139,31 +139,37 @@ go
 
 -- 128,876,544
 
-select cnt = count(*) from #grid,  #prospero
+-- select cnt = count(*) from #grid,  #prospero
 
-select * from #grid, #prospero 
-where rn = 1 
+-- select * from #grid, #prospero 
+-- where rn = 1 
+
+
+
+
+-------------------------------------------------------------------
+-------------------------------------------------------------------
+
 
 drop table if exists #res
 
 select 
 rn = 0
 , res = cast(null as decimal(38, 10) ) into #res
-from #prospero 
-where 1 = 0
+from #prospero where 1 = 0
+
+create index idx1 on #prospero(step_id)
+create index idx2 on #prospero(step, step_id)
 
 
-create index idx on #prospero(step, step_id)
--------------------------------------------------------------------
--------------------------------------------------------------------
 
 set nocount on; 
 
 declare @x decimal(38, 10)
 declare @y decimal(38, 10)
-declare @rn int = 1
+declare @rn int = 1 
 
-while @rn < 2 
+while @rn < 2 -- total number of points to be calculated
 begin
 
   select 
@@ -234,7 +240,7 @@ begin
     select @currStep, @res
     
 
-    if @currStep % 100 = 0 
+    if @currStep % 1000 = 0 
     begin 
       print @currStep 
     end 
@@ -256,5 +262,6 @@ begin
 END
 
 select * from #res
+
 
 
