@@ -182,7 +182,6 @@ create index idx1 on #prospero(step_id)
 create index idx2 on #prospero(step, step_id)
 
 
-
 set nocount on; 
 
 declare @x decimal(38, 10)
@@ -209,34 +208,31 @@ begin
 
 
   declare @currStep int = 0 
+  declare @totalStep int = (select count(step_id) from #prospero) -- 0 
 
-  while @currStep < (select count(*) from #prospero)
+  while @currStep < @totalStep -- (select count(*) from #prospero)
   BEGIN
 
 
     declare @op varchar(100)
     declare @op1 decimal(38, 10)
     declare @op2 decimal(38, 10)
-    
     declare @res decimal(38, 10)
 
     select 
     @op = op 
-    , @op1 = case when left(op1, 1) = '_' 
-                    then (select res from #tmp_res
-                          where step_id = op1_ref
-                          )
-                    else op1 
-                end  
+    , @op1 = case when left(op1, 1) = '_'  then ts1.res
+                  else op1 
+             end   
 
-    , @op2 = case when left(op2, 1) = '_' 
-                    then (select res from #tmp_res
-                          where step_id = op2_ref
-                          )
+    , @op2 = case when left(op2, 1) = '_'  then ts2.res
                     else op2 
-                end 
-    from #prospero 
-    where step_id = @currStep
+             end 
+    from #prospero p 
+	left outer join #tmp_res ts1 on p.op1_ref = ts1.step_id 
+	left outer join #tmp_res ts2 on p.op2_ref = ts2.step_id 
+    where p.step_id = @currStep
+    
     
    
     set @res = case when @op ='const' then @op1
