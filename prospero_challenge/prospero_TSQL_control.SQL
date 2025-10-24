@@ -2,7 +2,7 @@
 
 -- 20251023:  Total running time for one point - 10 seconds
 -- 20251024_133327: Adding indexes and taking out the subqueries from the while loop, total running time - 2.2 seconds for one point.
-
+-- 20251024_133630: Adding clustered indexes to the #tmp_res table, total running time - 0.379 seconds for one point.
 
 /* Steps to solve the problem in SQL
 
@@ -49,6 +49,7 @@ Takeaways -
 
 --update prospero_instruction set op1 = cast( cast( 4.76837 /  power(10, 7) as decimal(38,10)) as varchar(100))
 --where step = '_1069'
+
 
 
 
@@ -184,13 +185,17 @@ create index idx1 on #prospero(step_id)
 create index idx2 on #prospero(step, step_id)
 
 
+-------------------------------------------------------------------
+-------------------------------------------------------------------
+
+
 set nocount on; 
 
 declare @x decimal(38, 10)
 declare @y decimal(38, 10)
 declare @rn int = 1 
 
-while @rn < 2 -- total number of points to be calculated
+while @rn < 100 -- total number of points to be calculated
 begin
 
   select 
@@ -207,6 +212,8 @@ begin
   into #tmp_res 
   from #prospero 
   where 1 = 0
+
+  create clustered index idx_res on #tmp_res(step_id)
 
 
   declare @currStep int = 0 
