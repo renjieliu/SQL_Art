@@ -1,7 +1,7 @@
 -- Background: https://www.mattkeeter.com/projects/prospero/ 
 
 -- 20251023:  Total running time for one point - 10 seconds
--- 20251024_133327: Adding indexes and taking out the subqueries from the while loop, total running time - 3 seconds for one point.
+-- 20251024_133327: Adding indexes and taking out the subqueries from the while loop, total running time - 2.2 seconds for one point.
 
 
 /* Steps to solve the problem in SQL
