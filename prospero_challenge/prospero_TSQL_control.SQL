@@ -52,7 +52,6 @@ Takeaways -
 
 
 
-
 drop table if exists #tmp_space
 
 ; with cte as 
@@ -174,15 +173,8 @@ where left(op2, 1) = '_'
 -------------------------------------------------------------------
 
 
-drop table if exists #final_res
-
-select 
-rn = 0
-, res = cast(null as decimal(38, 10) ) into #final_res
-from #prospero where 1 = 0
-
-create index idx1 on #prospero(step_id)
-create index idx2 on #prospero(step, step_id)
+-- create index idx1 on #prospero(step_id)
+create clustered index idx on #prospero(step_id)
 
 
 -------------------------------------------------------------------
@@ -191,11 +183,19 @@ create index idx2 on #prospero(step, step_id)
 
 set nocount on; 
 
+drop table if exists #final_res
+
+select 
+rn = 0
+, res = cast(null as decimal(38, 10) ) into #final_res
+from #prospero where 1 = 0
+
+
 declare @x decimal(38, 10)
 declare @y decimal(38, 10)
-declare @rn int = 1 
+declare @rn int = 1
 
-while @rn < 100 -- total number of points to be calculated
+while @rn <= (select count(*) from #grid ) -- total number of points to be calculated
 begin
 
   select 
@@ -262,10 +262,10 @@ begin
     select @currStep, @res
     
 
-    if @currStep % 1000 = 0 
-    begin 
-      print @currStep 
-    end 
+    --if @currStep % 1000 = 0 
+    --begin 
+    --  print @currStep 
+    --end 
 
     set @currStep = @currStep + 1
 
@@ -283,7 +283,8 @@ begin
 
 END
 
-select * from #final_res
+select rn, res = iif(res >=0, '0', '1') , res from #final_res
+ 
 
 
 
