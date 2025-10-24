@@ -134,7 +134,7 @@ step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
 , op2_ref = cast(NULL as int)
 , res
 into #prospero
-from ARTDEV.renjie.prospero_instruction
+from dbo.prospero_instruction
 cross apply (select step_cleaned =  upper(REPLACE(step, '_', '') ) ) _
 cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_cleaned else '0' + step_cleaned end) __
 
@@ -195,7 +195,7 @@ declare @x decimal(38, 10)
 declare @y decimal(38, 10)
 declare @rn int = 1
 
-while @rn <= (select count(*) from #grid ) -- total number of points to be calculated
+while @rn <= 2 -- (select count(*) from #grid ) -- total number of points to be calculated
 begin
 
   select 
