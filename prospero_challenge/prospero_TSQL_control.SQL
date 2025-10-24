@@ -1,6 +1,8 @@
 -- Background: https://www.mattkeeter.com/projects/prospero/ 
 
--- Total running time for one point - 10 seconds
+-- 20251023:  Total running time for one point - 10 seconds
+-- 20251024_133327: Adding indexes and taking out the subqueries from the while loop, total running time - 3 seconds for one point.
+
 
 /* Steps to solve the problem in SQL
 
@@ -221,16 +223,16 @@ begin
 
     select 
     @op = op 
-    , @op1 = case when left(op1, 1) = '_'  then ts1.res
+    , @op1 = case when left(op1, 1) = '_'  then (select res from #tmp_res where step_id = op1_ref)
                   else op1 
              end   
 
-    , @op2 = case when left(op2, 1) = '_'  then ts2.res
+    , @op2 = case when left(op2, 1) = '_'  then (select res from #tmp_res where step_id = op2_ref) --  ts2.res
                     else op2 
              end 
     from #prospero p 
-	left outer join #tmp_res ts1 on p.op1_ref = ts1.step_id 
-	left outer join #tmp_res ts2 on p.op2_ref = ts2.step_id 
+	--left outer join #tmp_res ts1 on p.op1_ref = ts1.step_id 
+	--left outer join #tmp_res ts2 on p.op2_ref = ts2.step_id 
     where p.step_id = @currStep
     
     
@@ -267,7 +269,7 @@ begin
   @rn
   , res
   from #tmp_res
-  where step_id = (select max(step_id) from #tmp_res)
+  where step_id = @totalStep - 1
 
   set @rn = @rn + 1 
 
