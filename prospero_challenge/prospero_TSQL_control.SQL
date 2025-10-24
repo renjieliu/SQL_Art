@@ -127,7 +127,9 @@ step_id  = cast(CONVERT(varbinary, step_padded ,2) as int )
 , step
 , op = [action] 
 , op1 = case when op1 = 'NULL' then '' else op1 end
+, op1_ref = cast(NULL as int)
 , op2 = case when op2 = 'NULL' then '' else op2 end
+, op2_ref = cast(NULL as int)
 , res
 into #prospero
 from ARTDEV.renjie.prospero_instruction
@@ -136,8 +138,24 @@ cross apply (select step_padded = case when len(step_cleaned) % 2 = 0 then step_
 
 
 
-go 
-; 
+update tgt 
+set tgt.op1_ref = (select step_id from #prospero where step = tgt.op1)
+from #prospero tgt 
+where left(op1, 1) = '_'
+
+
+update tgt 
+set tgt.op2_ref = (select step_id from #prospero where step = tgt.op2)
+from #prospero tgt 
+where left(op2, 1) = '_'
+
+
+
+-- select * from #prospero
+-- go 
+-- ; 
+
+
 
 -- 128,876,544
 
@@ -197,33 +215,30 @@ begin
 
 
     declare @op varchar(100)
-    declare @op1_og varchar(100)
-    declare @op2_og varchar(100)
     declare @op1 decimal(38, 10)
     declare @op2 decimal(38, 10)
+    
     declare @res decimal(38, 10)
 
     select 
     @op = op 
-    , @op1_og = op1 
-    , @op2_og = op2 
+    , @op1 = case when left(op1, 1) = '_' 
+                    then (select res from #tmp_res
+                          where step_id = op1_ref
+                          )
+                    else op1 
+                end  
+
+    , @op2 = case when left(op2, 1) = '_' 
+                    then (select res from #tmp_res
+                          where step_id = op2_ref
+                          )
+                    else op2 
+                end 
     from #prospero 
     where step_id = @currStep
     
-    set @op1 = case when left(@op1_og, 1) = '_' 
-                    then (select res from #tmp_res
-                          where step_id = ( select step_id from #prospero where step = @op1_og)
-                          )
-                    else @op1_og 
-                end 
-
-    set @op2 = case when left(@op2_og, 1) = '_' 
-                    then (select res from #tmp_res
-                          where step_id = ( select step_id from #prospero where step = @op2_og)
-                          )
-                    else @op2_og 
-                end 
-
+   
     set @res = case when @op ='const' then @op1
                     when @op = 'add' then @op1 + @op2 
                     when @op = 'max' then iif( @op1 >= @op2,  @op1, @op2)
@@ -233,8 +248,8 @@ begin
                     when @op = 'sqrt' then power(@op1, 0.5)
                     when @op = 'square' then power(@op1,  2)
                     when @op = 'sub' then @op1 - @op2
-                    when @op = 'var-x' then cast(@x as decimal(38, 10))
-                    when @op = 'var-y' then cast(@y as decimal(38, 10))
+                    when @op = 'var-x' then  @x
+                    when @op = 'var-y' then  @y
                     else -999999999
                 end
 
