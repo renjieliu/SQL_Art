@@ -50,7 +50,8 @@ Takeaways -
 --update prospero_instruction set op1 = cast( cast( 4.76837 /  power(10, 7) as decimal(38,10)) as varchar(100))
 --where step = '_1069'
 
-
+create or alter proc usp_prospero as
+begin
 
 drop table if exists #tmp_space
 
@@ -278,6 +279,10 @@ begin
   from #tmp_res
   where step_id = @totalStep - 1
 
+  declare @msg varchar(100) =  'current point:' + cast(@rn as varchar(10))
+
+  raiserror( @msg  , -1, -1) with nowait
+
   set @rn = @rn + 1 
 
 
@@ -285,6 +290,13 @@ END
 
 select rn, res = iif(res >=0, '0', '1') , res from prospero_final_res
  
+
+
+
+end
+
+
+-- exec dbo.usp_prospero
 
 
 
