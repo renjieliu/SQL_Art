@@ -183,11 +183,11 @@ create clustered index idx on #prospero(step_id)
 
 set nocount on; 
 
-drop table if exists #final_res
+drop table if exists prospero_final_res
 
 select 
 rn = 0
-, res = cast(null as decimal(38, 10) ) into #final_res
+, res = cast(null as decimal(38, 10) ) into prospero_final_res
 from #prospero where 1 = 0
 
 
@@ -195,7 +195,7 @@ declare @x decimal(38, 10)
 declare @y decimal(38, 10)
 declare @rn int = 1
 
-while @rn <= 2 -- (select count(*) from #grid ) -- total number of points to be calculated
+while @rn <= (select count(*) from #grid ) -- total number of points to be calculated
 begin
 
   select 
@@ -271,7 +271,7 @@ begin
 
   END 
  
-  insert into #final_res 
+  insert into prospero_final_res 
   select 
   @rn
   , res
@@ -283,7 +283,7 @@ begin
 
 END
 
-select rn, res = iif(res >=0, '0', '1') , res from #final_res
+select rn, res = iif(res >=0, '0', '1') , res from prospero_final_res
  
 
 
